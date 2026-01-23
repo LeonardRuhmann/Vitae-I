@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import spacy
-# from spacy.pipeline import EntityRuler
 
 # Initialize the API
 app = FastAPI(title="Vitae-I API", version="1,0")
