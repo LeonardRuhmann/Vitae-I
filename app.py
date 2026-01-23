@@ -5,9 +5,26 @@ import spacy
 @st.cache_resource
 # This fuction run the model.
 def load_model():
-    return spacy.load("pt_core_news_lg")
+    nlp = spacy.load("pt_core_news_lg")
+    ruler = nlp.add_pipe("entity_ruler", before="ner")
+
+    skills_list = [
+            "Python", "Java", "C++", "C#", "JavaScript", "TypeScript", "HTML", "CSS",
+            "React", "Angular", "Vue", "Node.js", "Django", "Flask", "FastAPI",
+            "Streamlit", "SQL", "MySQL", "PostgreSQL", "MongoDB", "Docker", 
+            "Kubernetes", "AWS", "Azure", "GCP", "Git", "GitHub", "Linux",
+            "Machine Learning", "Deep Learning", "NLP", "SpaCy", "Scikit-Learn",
+            "Pandas", "NumPy", "TensorFlow", "PyTorch"
+        ]
+
+    patterns = [{"label": "SKILL", "pattern": [{"LOWER": skill.lower()}]} for skill in skills_list]
+
+    ruler.add_patterns(patterns)
+
+    return nlp
 
 nlp = load_model()
+
 
 # Front-end code
 st.title("Vitae-I: Intelligent Curriculum Analyser")
@@ -25,12 +42,21 @@ if st.button("Analyse Resume"):
         
         st.write("### Analysis Results")
 
-        st.write("** Entites found by SpaCy:**")
+        skills_found = []
+        other_entities = []
 
-        entities = [(ent.text, ent.label_) for ent in doc.ents]
+        for ent in doc.ents:
+            if ent.label_ == "SKILL":
+                if ent.text not in skills_found:
+                    skills_found.append(ent.text)
+            else:
+                other_entities.append(f"{ent.text} ({ent.label_})")
 
-        if entities:
-            for ent_text, ent_label in entities:
-                st.info(f"**{ent_text}** - {ent_label}")
-        else:
-            st.write("No specific entities found. Try a more detailed text")      
+    st.write("### Skills Identified: ")
+    if skills_found:
+        st.write(", ".join([f"`{skill}`" for skill in skills_found]))
+    else:
+        st.info("No specific technical skills found from our list")
+
+    with st.expander("See other entities (Raw data)"):
+        st.write(other_entities)
