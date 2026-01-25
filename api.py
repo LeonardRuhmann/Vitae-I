@@ -46,8 +46,6 @@ async def analyze_resume(resume: ResumeText):
             if ent.text not in skills:
                 skills.append(ent.text)
         else:
-            other_entities.append(f"{ent.text} ({ent.label_})")
+            other_entities.append({"text": ent.text, "label": ent.label_})
 
-    return {
-        "skills": skills, "entities": other_entities
-    }
+    return { "skills": skills, "entities": other_entities }
