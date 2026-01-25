@@ -14,7 +14,6 @@ if st.button("Analyse Resume"):
     if cv_text.strip() == "":
         st.warning("Please paste some text first!")
     else:
-        # doc = nlp(cv_text)
         try:
             with st.spinner("consulting the AI brain..."):
                 response = requests.post(API_URL, json={"text": cv_text})
