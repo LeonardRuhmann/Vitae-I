@@ -7,7 +7,6 @@ API_URL = "http://127.0.0.1:8000/analyze"
 st.title("Vitae-I: Intelligent Curriculum Analyser")
 
 #place where the user can put the resume
-# cv_text = st.text_area("Paste the resume text here:", height=300, placeholder="Example: João Silva, Developer at Google")
 uploaded_file = st.file_uploader("Upload your resume (PDF only", type=["pdf"])
 if uploaded_file is not None:
     st.success("File uploaded sucessfully!")
