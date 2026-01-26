@@ -1,4 +1,6 @@
 import re
+import io
+from pypdf import PdfReader
 
 def clean_text(text: str) -> str:
     """
@@ -49,3 +51,20 @@ def is_valid_entity(text: str, label: str) -> bool:
             return False
         
     return True
+
+def read_pdf(file_byte: bytes) -> str:
+    """ Extracts raw text from a PDF file in memory """
+    try:
+        # create a PDF reader object from the bytes
+        pdf = PdfReader(io.BytesIO(file_byte))
+
+        text = ""
+
+        for page in pdf.pages:
+            text += page.extract_text() + "\n"
+
+        return text
+
+    except Exception as e:
+        # If the pdf is corrupted or weird, return empty string
+        return ""
