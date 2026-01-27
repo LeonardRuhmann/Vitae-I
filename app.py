@@ -25,22 +25,8 @@ if uploaded_file is not None:
                     data = response.json()
 
                     skills = data.get("skills", [])
-                    entities = data.get("entities", [])
-
-                    organzations = []
-                    locations = []
-                    people = []
-
-                    for entity in entities:
-                        label = entity.get("label")
-                        text = entity.get("text")
-
-                        if label == "ORG":
-                            organzations.append(text)
-                        elif label == "LOC":
-                            locations.append(text)
-                        elif label == "PER":
-                            people.append(text)
+                    people = data.get("people", [])
+                    info = data.get("info", [])
 
                     st.markdown("### Skills Identified (from API)")
 
@@ -54,30 +40,28 @@ if uploaded_file is not None:
                         st.info("No skills found.")
                     
                     with st.expander("### Extracted content:"):
-                        column1, column2, column3 = st.columns(3)
+                        column1, column2 = st.columns([1, 3])
+                        
                         with column1:
-                            st.write("#### Organizations")
-                            if organzations:
-                                for organization in list(set(organzations)):
-                                    st.write(f"- {organization}")
-                            else:
-                                st.caption("No organizations found.")
-                            
-                        with column2:
-                            st.write("#### Locations:")
-                            if locations:
-                                for location in list(set(locations)):
-                                    st.write(f"- {location}")
-                            else:
-                                st.caption("No locations found.")
-
-                        with column3:
-                            st.write("#### People:")
+                            st.write("#### Candidate")
                             if people:
                                 for person in list(set(people)):
                                     st.write(f"- {person}")
                             else:
                                 st.caption("No people found.")
+                        
+                        with column2:
+                            st.write("#### Key Entities")
+                            if info:
+                                # Display as comma-separated tags
+                                info_text = ", ".join([f"{item}" for item in info])
+                                st.markdown(
+                                    f'<p style="font-size: 1.1em; color: white; padding: 10px;">{info_text}</p>',
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.caption("No key entities found.")
+                        
                         with st.expander("see extracted text"):
                             st.text(data.get("text_preview",  "No preview avaliable"))
 

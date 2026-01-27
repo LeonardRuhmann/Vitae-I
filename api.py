@@ -22,15 +22,6 @@ class ResumeText(BaseModel):
 
 # This fuction run the model.
 def load_model_with_ruler():
-    nlp = spacy.load("pt_core_news_lg")
-    ruler = nlp.add_pipe("entity_ruler", config={"overwrite_ents": False}, before="ner")
-# Define the Input Format (Schema)
-# This tells the API: "I expect a JSON with a field called 'text' that is a string."
-class ResumeText(BaseModel):
-    text: str
-
-# This fuction run the model.
-def load_model_with_ruler():
     nlp = spacy.load(SPACY_MODEL)
     ruler = nlp.add_pipe("entity_ruler", config={"overwrite_ents": False}, before="ner")
 
@@ -66,17 +57,22 @@ async def analyze_resume(file: UploadFile = File(...)):
 
     # Extract the data
     skills = []
-    other_entities = []
+    people = []
+    info = []
 
     for ent in doc.ents:
-        if ent.label_ == "SKILL":
-            if ent.text not in skills:
-                skills.append(ent.text)
+        if ent.label_ == "SKILL" and ent.text not in skills:
+            skills.append(ent.text)
+        elif ent.label_ == "PER" and len(people) == 0 and is_valid_entity(ent.text, ent.label_):
+            people.append(ent.text)
         else:
-            if is_valid_entity(ent.text, ent.label_):
-                other_entities.append({"text": ent.text, "label": ent.label_})
+            # Capture Everything Else (Orgs, Locations, and Extra People)
+            if is_valid_entity(ent.text, ent.label_) and ent.text not in info:
+                info.append(ent.text)
 
-    return {"text_preview": processed_text,
-    "skills": skills, 
-    "entities": other_entities 
+    return {
+        "text_preview": processed_text,
+        "skills": skills,
+        "people": people,
+        "info": info
     }
