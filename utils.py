@@ -44,6 +44,13 @@ def clean_text(text: str) -> str:
     """
     Pre-processing: Removes noise but preserves sentence structure.
     """
+    # Regex to identify "Page 1 of 3", "Página 2", "1 / 4"
+    # 1. Matches "Page 1", "Pag. 1", "Página 1 de 2" (Case Insensitive)
+    page_pattern = re.compile(r'^\s*(?:p[áa]gina|page|p[áa]g\.?)\s*\d+(?:\s*(?:de|of|/)\s*\d+)?\s*$', re.IGNORECASE)
+    # 2. Matches isolated numbers like "1 / 3" or "2 of 5"
+    number_pattern = re.compile(r'^\s*\d+\s*(?:/|of|de)\s*\d+\s*$', re.IGNORECASE)
+
+
     # Add sentence boundary when a line that looks like a name is followed by skills/job keywords
     # This prevents "Leonardo Ruhmann\nFullstack" from becoming one entity
     lines = text.split('\n')
@@ -54,6 +61,8 @@ def clean_text(text: str) -> str:
     for i, line in enumerate(lines):
         line = line.strip()
         if not line: continue
+
+        if page_pattern.match(line) or number_pattern.match(line): continue
 
         add_period = False
         
@@ -129,6 +138,8 @@ def is_valid_entity(text: str, label: str) -> bool:
     # Rule 6: Filter LOC (Location) entities - similar checks
     if label == "LOC":
         if text_lower in INVALID_WORDS: return False
+        # Rule: People don't have numbers or symbols
+        if re.search(r'\d|[!@#$%*]', text): return False
 
     return True
 
