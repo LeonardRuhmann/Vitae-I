@@ -31,7 +31,7 @@ def load_model_with_ruler():
         pattern = [{"LOWER": t} for t in toks]
         patterns.append({"label": "SKILL", "pattern": pattern})
 
-    organizations = ["Banco do Brasil", "Universidade Federal de Minas Gerais", "UFMG"]
+    organizations = ["Banco do Brasil", "Universidade Federal de Minas Gerais", "UFMG", "Universidade Federal do Ceará"]
     for org in organizations:
         toks = [tok.lower() for tok in org.split()]
         patterns.append({"label": "ORG", "pattern": [{"LOWER": t} for t in toks]})
@@ -76,7 +76,7 @@ async def analyze_resume(file: UploadFile = File(...)):
             if is_valid_entity(ent.text, ent.label_):
                 other_entities.append({"text": ent.text, "label": ent.label_})
 
-    return {"text_preview": processed_text[:500],
+    return {"text_preview": processed_text,
     "skills": skills, 
     "entities": other_entities 
     }

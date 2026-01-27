@@ -2,18 +2,91 @@ import re
 import io
 from pypdf import PdfReader
 
+INVALID_WORDS = {
+    # Resume Headers (These are NOT People/Orgs)
+    "resumo", "summary", "objetivo", "objective", "perfil", "profile",
+    "experiência", "experiencia", "experience", "profissional", "professional",
+    "educação", "educacao", "education", "formação", "formacao", "academic",
+    "habilidades", "skills", "competências", "competencias", "qualificações",
+    "idiomas", "languages", "certificações", "certificacoes", "certifications",
+    "projetos", "projects", "contato", "contact", "sobre", "about",
+    "interesses", "interests", "referências", "references", "cursos", "courses",
+    
+    # Degrees / Titles (These are NOT Orgs)
+    "graduação", "graduacao", "bacharelado", "licenciatura", "mestrado", "doutorado",
+    "bachelor", "master", "phd", "degree", "mba", "pós-graduação", "pos-graduacao",
+    "ensino médio", "ensino medio", "high school", "técnico", "tecnico",
+    
+    # Common Noise / Levels (These are NOT Locations/Orgs)
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho", 
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+    "junior", "pleno", "senior", "lead", "tech", "head", "specialist",
+    "iniciante", "intermediário", "intermediario", "avançado", "avancado",
+    "fluente", "nativo", "native", "básico", "basico",
+    "ano", "anos", "year", "years", "atualmente", "current", "present",
+    "software", "hardware", "programação", "programming", "desenvolvimento de software", "desenvolvimento", "development",
+    "computação", "computing", "tecnologia", "technology", "sistema", "sistemas",
+    "telefone", "phone", "email", "e-mail", "endereço", "address",
+    "cidade", "city", "estado", "state", "país", "country", "brasil", "brazil"
+}
+
+# Jobs (Used to filter False Organizations)
+JOB_KEYWORDS = {
+    "dev", "developer", "desenvolvedor", "engenheiro", "engineer", 
+    "analista", "analyst", "gerente", "manager", "assistente", "assistant",
+    "consultor", "consultant", "coordenador", "coordinator", "diretor", "director",
+    "estagiário", "estagiario", "intern", "ceo", "cto", "cio", "founder", "co-founder"
+}
+
+
 def clean_text(text: str) -> str:
     """
     Pre-processing: Removes noise but preserves sentence structure.
     """
-    # 1. Replace Newlines with a Period + Space (to fake a sentence break)
-    # This helps the AI understand that the line ended.
-    text = text.replace("\n", ". ")
+    # Add sentence boundary when a line that looks like a name is followed by skills/job keywords
+    # This prevents "Leonardo Ruhmann\nFullstack" from becoming one entity
+    lines = text.split('\n')
+    cleaned_lines = []
     
-    # 2. Replace multiple spaces with a single space
+    SECTION_STARTERS = INVALID_WORDS.union(JOB_KEYWORDS)
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if not line: continue
+
+        add_period = False
+        
+        # Check if current line looks like a name (2-3 capitalized words, no special chars)
+        # Pattern: FirstName LastName or FirstName MiddleName LastName
+        if line[-1] not in ".!?:;":
+            
+            if i < len(lines) - 1:
+                next_line = lines[i+1].strip()
+                next_line_lower = next_line.lower()
+
+                if any(next_line_lower.startswith(word) for word in SECTION_STARTERS):
+                    add_period = True
+                elif len(line) < 50:
+                    if next_line and next_line[0].isupper():
+                        add_period = True
+                    elif len(next_line) > 50:
+                        add_period = True
+
+        if add_period:        
+            line += "."
+                
+        cleaned_lines.append(line)
+    
+    text = ' '.join(cleaned_lines)
+    
+    # Replace newlines with space
+    text = re.sub(r'\n+', ' ', text)
+    
+    # Replace multiple spaces with a single space
     text = re.sub(r'\s+', ' ', text)
     
-    # 3. Strip leading/trailing whitespace
+    # Strip leading/trailing whitespace
     return text.strip()
 
 
@@ -22,34 +95,41 @@ def is_valid_entity(text: str, label: str) -> bool:
     Post-processing filter: Decides if an entity is 'real' or noise.
     Returns True if valid, False if it should be discarded.
     """
-    # Rule 1: Regex to catch URLs, Emails, or file paths mistakenly labeled
-    url_pattern = re.compile(r'https?://|www\.|@|\.com|\.net|\.org|http')
+    text = text.strip()
+    text_lower = text.lower()
+
+    # Universal Rules:
+    if len(text) < 3: return False
+    if re.search(r'https?://|www\.|@|\.com', text_lower): return False # Rule 1: Regex to catch URLs, Emails, or file paths mistakenly labeled
+
+    # Rule: Check against our Massive Blacklist
+    if text_lower in INVALID_WORDS: return False
     
-    if url_pattern.search(text.lower()):
-        return False
-
-    # Rule 2: Remove tiny entities (1 or 2 chars) which are usually noise
-    # Exception: "C" or "R" are valid languages, but usually caught as SKILL, not ORG/PER.
-    # For safety in ORG/PER/LOC, we prefer length > 2
-    if len(text) < 3:
-            return False
-
+    # Rule 4: Filter PER (Person) entities
     if label == "PER":
-        if text.islower():
-            return False
+        if text.islower(): return False
+        # Rule: A Person is NOT a Job Title (e.g. "Dev Backend")
+        if any(job in text_lower for job in JOB_KEYWORDS): return False
+        # Rule: A Person is NOT a Section Header (e.g. "Certificações")
+        if text_lower in INVALID_WORDS: return False
+        # Rule: People don't have numbers or symbols
+        if re.search(r'\d|[!@#$%*]', text): return False
+        # Rule: Must be at least 2 names ("Douglas" is risky, "Douglas Nascimento" is safe)
+        if " " not in text: return False
     
-        job_keyword = [
-            "dev", "developer", "backend", "frontend", "fullstack", "software",
-            "engenheiro", "engineer", "analista", "analyst", "gerente", "manager",
-            "junior", "pleno", "senior", "tech lead", "cto", "ceo"
-        ]
+    # Rule 5: Filter ORG (Organization) entities
+    if label == "ORG":
+        # Rule: "Engenheiro de Software" is a Job, NOT an Organization
+        if any(job in text_lower for job in JOB_KEYWORDS): return False
+        # Rule: "Graduação em..." is a Degree, NOT an Organization //Need update in the future
+        if text_lower.startswith(("graduação", "bacharelado", "ensino", "mestrado")): return False
+        # Rule: Real Orgs aren't usually all lowercase
+        if text.islower(): return False
     
-        if any(keyword in text.lower() for keyword in job_keyword):
-            return False
+    # Rule 6: Filter LOC (Location) entities - similar checks
+    if label == "LOC":
+        if text_lower in INVALID_WORDS: return False
 
-        if text in ["People:", "Pessoas:", "Contato:"]:
-            return False
-        
     return True
 
 def read_pdf(file_byte: bytes) -> str:
