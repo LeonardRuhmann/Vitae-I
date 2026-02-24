@@ -140,25 +140,7 @@ pytest tests/
 ---
 
 ## 🏗️ Architecture
-
-```
-┌─────────────────────────┐       HTTP POST /analyze        ┌──────────────────────────────┐
-│   Streamlit Frontend    │ ──────────────────────────────► │      FastAPI Backend         │
-│   (app.py)              │                                  │      (api.py)                │
-│                         │ ◄────────────────────────────── │                              │
-│  - File uploader        │         JSON response            │  - PDF text extraction       │
-│  - Results dashboard    │                                  │  - Text pre-processing       │
-└─────────────────────────┘                                  │  - spaCy NLP pipeline        │
-                                                              │  - Entity validation         │
-                                                              └──────────────────────────────┘
-                                                                           │
-                                                              ┌────────────▼─────────────────┐
-                                                              │   config.py                  │
-                                                              │   - SKILLS dictionary        │
-                                                              │   - ORGANIZATIONS dictionary │
-                                                              │   - LOCATIONS dictionary     │
-                                                              └──────────────────────────────┘
-```
+![Vitae-I System Architecture](./docs/architecture-diagram-v1.0.png)
 
 The frontend and backend are **fully decoupled**. The Streamlit app is just an HTTP client — the API can be used independently by any other consumer (a CLI tool, another web app, etc.).
 
