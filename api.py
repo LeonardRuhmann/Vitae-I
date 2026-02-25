@@ -57,23 +57,23 @@ async def analyze_resume(request: Request, file: UploadFile = File(...)):
     doc = nlp(processed_text)
 
     # Extract the data
-    skills = []
+    skills = set()
     people = []
-    info = []
+    info = set()
 
     for ent in doc.ents:
-        if ent.label_ == "SKILL" and ent.text not in skills:
-            skills.append(ent.text)
-        elif ent.label_ == "PER" and len(people) == 0 and is_valid_entity(ent.text, ent.label_):
+        if ent.label_ == "SKILL":
+            skills.add(ent.text)
+        elif ent.label_ == "PER" and not people and is_valid_entity(ent.text, ent.label_):
             people.append(ent.text)
         else:
             # Capture Everything Else (Orgs, Locations, and Extra People)
-            if is_valid_entity(ent.text, ent.label_) and ent.text not in info:
-                info.append(ent.text)
+            if is_valid_entity(ent.text, ent.label_):
+                info.add(ent.text)
 
     return {
         "text_preview": processed_text,
-        "skills": skills,
+        "skills": list(skills),
         "people": people,
-        "info": info
+        "info": list(info)
     }

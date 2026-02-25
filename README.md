@@ -8,7 +8,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-teal?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.53-red?logo=streamlit)](https://streamlit.io/)
 [![spaCy](https://img.shields.io/badge/spaCy-3.8-09a3d5?logo=spacy)](https://spacy.io/)
-[![Version](https://img.shields.io/badge/version-v1.0.1-orange.svg)](#)
+[![Version](https://img.shields.io/badge/version-v1.0.2-orange.svg)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Upload a PDF resume and get an instant AI-powered breakdown of the candidate's skills, identity, and key background — no manual reading required.
@@ -162,6 +162,12 @@ Skills like "React" or "FastAPI" are proper nouns but not famous enough for a ge
 
 ### Why FastAPI instead of serving directly from Streamlit?
 Separation of concerns. The API can be consumed independently, tested in isolation, versioned, and swapped for a different frontend without any backend changes. It also enables future scaling (e.g., putting the API behind a queue if processing becomes heavy).
+
+### Why load the spaCy model via FastAPI's `lifespan`?
+The model is loaded once at server startup using a `lifespan` context manager and stored in `app.state.nlp`. The alternative — a bare global variable — loads the model as a side-effect of importing the module, which makes startup order unpredictable, harder to test, and impossible to mock cleanly. The `lifespan` approach gives explicit control over when the model loads and frees up the shutdown hook for future cleanup logic.
+
+### Why use `set` for skill and entity deduplication?
+The entity loop originally used `list` and checked membership with `ent.text not in list` — an O(N) operation inside a loop. Because Python `set` is backed by a hash table, membership checks are O(1). `skills` and `info` are sets during extraction and converted to `list` only at return time for JSON serialization. The `people` collection stays a `list` since it holds at most one item.
 
 ### What I'd do differently
 - Add an async job queue (Celery or ARQ) for handling many simultaneous uploads without blocking.
