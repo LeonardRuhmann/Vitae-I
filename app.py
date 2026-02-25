@@ -3,7 +3,15 @@ import streamlit as st
 
 API_URL = "http://127.0.0.1:8000/analyze"
 
+
+def load_css(filepath: str):
+    """Injects a CSS file into the Streamlit app."""
+    with open(filepath) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
 # Front-end code
+load_css("styles/styles.css")
 st.title("Vitae-I: Intelligent Curriculum Analyser")
 
 #place where the user can put the resume
@@ -33,7 +41,7 @@ if uploaded_file is not None:
                     if skills:
                         skills_text = ", ".join([f"{skill}" for skill in skills])
                         st.markdown(
-                            f'<p style="font-size: 1.3em; font-weight: bold; color: white; background-color: #157353; border-radius: 20px; padding: 15px; margin: 10px 0;">{skills_text}</p>',
+                            f'<p class="skills-tag">{skills_text}</p>',
                             unsafe_allow_html=True
                         )
                     else:
@@ -56,7 +64,7 @@ if uploaded_file is not None:
                                 # Display as comma-separated tags
                                 info_text = ", ".join([f"{item}" for item in info])
                                 st.markdown(
-                                    f'<p style="font-size: 1.1em; color: white; padding: 10px;">{info_text}</p>',
+                                    f'<p class="info-tag">{info_text}</p>',
                                     unsafe_allow_html=True
                                 )
                             else:
