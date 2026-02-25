@@ -1,0 +1,17 @@
+/* Skills tag — green pill displayed after analysis */
+.skills-tag {
+    font-size: 1.3em !important;
+    font-weight: bold;
+    color: white;
+    background-color: #157353;
+    border-radius: 20px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+/* Info/Entity tag — secondary results display */
+.info-tag {
+    font-size: 1.1em;
+    color: white;
+    padding: 10px;
+}
