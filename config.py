@@ -2,7 +2,7 @@
 
 # API Configuration
 API_TITLE = "Vitae-I API"
-API_VERSION = "1.0.1"
+API_VERSION = "1.0.2"
 
 # SpaCy Model Configuration
 SPACY_MODEL = "pt_core_news_lg"
