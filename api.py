@@ -1,5 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 import spacy
 from utils import clean_text, is_valid_entity, read_pdf
 from config import SKILLS, ORGANIZATIONS, LOCATIONS, API_TITLE, API_VERSION, SPACY_MODEL
@@ -12,15 +12,7 @@ def make_phrase_patterns(items, label):
         patterns.append({"label": label, "pattern": [{"LOWER": t} for t in toks]})
     return patterns
 
-# Initialize the API
-app = FastAPI(title=API_TITLE, version=API_VERSION)
-
-# Define the Input Format (Schema)
-# This tells the API: "I expect a JSON with a field called 'text' that is a string."
-class ResumeText(BaseModel):
-    text: str
-
-# This fuction run the model.
+# This fuction runs the model.
 def load_model_with_ruler():
     nlp = spacy.load(SPACY_MODEL)
     ruler = nlp.add_pipe("entity_ruler", config={"overwrite_ents": False}, before="ner")
@@ -35,10 +27,18 @@ def load_model_with_ruler():
 
     return nlp
 
-nlp = load_model_with_ruler()
+# Initialize the API with a lifespan to manage the NLP model
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load the spaCy model on startup and store it in app.state."""
+    app.state.nlp = load_model_with_ruler()
+    yield
+    # Shutdown: no explicit cleanup needed for spaCy, but the hook is here
+
+app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
 
 @app.post("/analyze")
-async def analyze_resume(file: UploadFile = File(...)):
+async def analyze_resume(request: Request, file: UploadFile = File(...)):
     # Check file type
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="File must be a PDF")
@@ -48,11 +48,12 @@ async def analyze_resume(file: UploadFile = File(...)):
     raw_text = read_pdf(content)
 
     if not raw_text.strip():
-        raise HTTPException(status_code=400, detail="Could nt extract text from PDF. It might be an image scan")
+        raise HTTPException(status_code=400, detail="Couldn't extract text from PDF. It might be an image scan")
 
     processed_text = clean_text(raw_text)
 
-    # Process the text
+    # Retrieve the NLP model from app state and process the text
+    nlp = request.app.state.nlp
     doc = nlp(processed_text)
 
     # Extract the data
