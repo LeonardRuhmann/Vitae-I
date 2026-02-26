@@ -1,7 +1,8 @@
+import os
 import requests
 import streamlit as st
 
-API_URL = "http://127.0.0.1:8000/analyze"
+API_URL = os.environ.get("VITAE_API_URL", "http://127.0.0.1:8000/analyze")
 
 
 def load_css(filepath: str):
