@@ -2,8 +2,8 @@ import re
 import io
 from pypdf import PdfReader
 
-INVALID_WORDS = {
-    # Resume Headers (These are NOT People/Orgs)
+# Resume section headers (not People or Orgs)
+SECTION_HEADERS = {
     "resumo", "summary", "objetivo", "objective", "perfil", "profile",
     "experiência", "experiencia", "experience", "profissional", "professional",
     "educação", "educacao", "education", "formação", "formacao", "academic",
@@ -11,25 +11,37 @@ INVALID_WORDS = {
     "idiomas", "languages", "certificações", "certificacoes", "certifications",
     "projetos", "projects", "contato", "contact", "sobre", "about",
     "interesses", "interests", "referências", "references", "cursos", "courses",
-    
-    # Degrees / Titles (These are NOT Orgs)
+}
+
+# Academic degrees and titles (not Orgs)
+DEGREE_KEYWORDS = {
     "graduação", "graduacao", "bacharelado", "licenciatura", "mestrado", "doutorado",
     "bachelor", "master", "phd", "degree", "mba", "pós-graduação", "pos-graduacao",
     "ensino médio", "ensino medio", "high school", "técnico", "tecnico",
-    
-    # Common Noise / Levels (These are NOT Locations/Orgs)
-    "janeiro", "fevereiro", "março", "abril", "maio", "junho", 
+}
+
+# Proficiency levels, time words, and generic tech noise (not Locations/Orgs)
+NOISE_WORDS = {
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
     "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
     "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
     "junior", "pleno", "senior", "lead", "tech", "head", "specialist",
     "iniciante", "intermediário", "intermediario", "avançado", "avancado",
     "fluente", "nativo", "native", "básico", "basico",
     "ano", "anos", "year", "years", "atualmente", "current", "present",
-    "software", "hardware", "programação", "programming", "desenvolvimento de software", "desenvolvimento", "development",
-    "computação", "computing", "tecnologia", "technology", "sistema", "sistemas",
-    "telefone", "phone", "email", "e-mail", "endereço", "address",
-    "cidade", "city", "estado", "state", "país", "country", "brasil", "brazil"
+    "software", "hardware", "programação", "programming", "desenvolvimento de software",
+    "desenvolvimento", "development", "computação", "computing",
+    "tecnologia", "technology", "sistema", "sistemas",
 }
+
+# Contact info and generic location noise (not named entities)
+CONTACT_KEYWORDS = {
+    "telefone", "phone", "email", "e-mail", "endereço", "address",
+    "cidade", "city", "estado", "state", "país", "country", "brasil", "brazil",
+}
+
+# Unified blacklist — preserves backward compatibility with is_valid_entity() and clean_text()
+INVALID_WORDS = SECTION_HEADERS | DEGREE_KEYWORDS | NOISE_WORDS | CONTACT_KEYWORDS
 
 # Jobs (Used to filter False Organizations)
 JOB_KEYWORDS = {
