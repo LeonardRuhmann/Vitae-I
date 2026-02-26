@@ -8,7 +8,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-teal?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.53-red?logo=streamlit)](https://streamlit.io/)
 [![spaCy](https://img.shields.io/badge/spaCy-3.8-09a3d5?logo=spacy)](https://spacy.io/)
-[![Version](https://img.shields.io/badge/version-v1.0.3-orange.svg)](#)
+[![Version](https://img.shields.io/badge/version-v1.0.4-orange.svg)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Upload a PDF resume and get an instant AI-powered breakdown of the candidate's skills, identity, and key background — no manual reading required.
@@ -125,11 +125,17 @@ This will start:
 
 ### Environment Variables
 
-No `.env` file is required to run the project in its current state. All configuration lives in `config.py`. If you need to change the API URL the Streamlit app targets, update this line in `app.py`:
+A `.env.example` file is included at the root of the project. Copy it to `.env` to override defaults:
 
-```python
-API_URL = "http://127.0.0.1:8000/analyze"
+```bash
+cp .env.example .env
 ```
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITAE_API_URL` | `http://127.0.0.1:8000/analyze` | URL of the FastAPI backend |
+
+The application reads `VITAE_API_URL` at startup via `os.environ.get()`. Local development works with no `.env` file at all — the default value is used automatically.
 
 ### Running tests
 
