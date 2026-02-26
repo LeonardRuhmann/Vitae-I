@@ -5,15 +5,15 @@ from utils import clean_text, is_valid_entity, read_pdf
 from config import SKILLS, ORGANIZATIONS, LOCATIONS, API_TITLE, API_VERSION, SPACY_MODEL
 
 
-def make_phrase_patterns(items, label):
+def make_phrase_patterns(items: list[str], label: str) -> list[dict]:
     patterns = []
     for item in items:
         toks = [tok.lower() for tok in item.split()]
         patterns.append({"label": label, "pattern": [{"LOWER": t} for t in toks]})
     return patterns
 
-# This fuction runs the model.
-def load_model_with_ruler():
+# This function runs the model.
+def load_model_with_ruler() -> spacy.Language:
     nlp = spacy.load(SPACY_MODEL)
     ruler = nlp.add_pipe("entity_ruler", config={"overwrite_ents": False}, before="ner")
 
