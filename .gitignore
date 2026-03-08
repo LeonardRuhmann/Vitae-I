@@ -12,3 +12,6 @@ __pycache__/
 
 # Ignore local environment variables (use .env.example as a template)
 .env
+
+# Ignore Alembic cache
+alembic/versions/__pycache__/
