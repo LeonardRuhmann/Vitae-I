@@ -205,27 +205,27 @@ The entity loop originally used `list` and checked membership with `ent.text not
 
 ## ⚖️ Engineering Trade-offs
 
-Para garantir que o **Vitae-I** seja escalável, ágil e viável para ser hospedado em *Free Tiers* (servidores gratuitos com recursos limitados), as seguintes decisões de engenharia foram tomadas:
+To ensure that **Vitae-I** is scalable, agile, and viable for hosting on *Free Tiers* (free servers with limited resources), the following engineering decisions were made:
 
-### 1. Autenticação: Session-based UUID vs. Sistema Completo de Login
-* **Decisão:** O sistema utiliza um UUID temporário gerado no frontend (armazenado em *localStorage*) como `user_id`, em vez de um sistema tradicional de contas (JWT/OAuth).
-* **Trade-off:** Abrimos mão da persistência cross-device (o usuário não vê o mesmo lote no celular e no PC) para focar 100% no MVP e na UX sem atritos. Isso evitou o inchaço de escopo (*Scope Creep*) de construir fluxos de recuperação de senha e e-mail na Fase 1.
+### 1. Authentication: Session-based UUID vs. Full Login System
+* **Decision:** The system uses a temporary UUID generated on the frontend (stored in *localStorage*) as `user_id`, instead of a traditional account system (JWT/OAuth).
+* **Trade-off:** We give up cross-device persistence (the user won't see the same batch on their phone and PC) to focus 100% on the MVP and frictionless UX. This avoided the *Scope Creep* of building password recovery and email flows in Phase 1.
 
-### 2. Armazenamento: PostgreSQL + Colunas JSON nativas
-* **Decisão:** As entidades extraídas pelo modelo de IA (Skills, Pessoas, Localizações) são salvas diretamente em colunas do tipo `JSON` no PostgreSQL, em vez de tabelas relacionais separadas.
-* **Trade-off:** Perdemos um pouco de rigidez e validação de chaves estrangeiras para essas tags específicas. Em troca, ganhamos extrema flexibilidade: se o modelo NLP for atualizado para extrair novas categorias de dados amanhã, o banco de dados aceita imediatamente, sem necessidade de novas *Migrations*.
+### 2. Storage: PostgreSQL + Native JSON Columns
+* **Decision:** The entities extracted by the AI model (Skills, People, Locations) are saved directly in `JSON`-type columns in PostgreSQL, instead of separate relational tables.
+* **Trade-off:** We lose some rigidity and foreign key validation for these specific tags. In return, we gain extreme flexibility: if the NLP model is updated to extract new data categories tomorrow, the database accepts them immediately, with no new *Migrations* required.
 
-### 3. Concorrência: Intercalação Justa com `asyncio.Semaphore(1)`
-* **Decisão:** O processamento em lote não é paralelizado de forma agressiva. Limitamos a extração síncrona do modelo spaCy a 1 documento por vez globalmente, usando Threads.
-* **Trade-off:** O tempo total para processar 100 currículos é tecnicamente maior. No entanto, protegemos a memória RAM do servidor (evitando crashes por *Out of Memory*), enquanto a lógica de intercalação garante que múltiplos recrutadores vejam suas barras de progresso andando simultaneamente na interface.
+### 3. Concurrency: Fair Interleaving with `asyncio.Semaphore(1)`
+* **Decision:** Batch processing is not aggressively parallelized. We limit the synchronous spaCy model extraction to 1 document at a time globally, using Threads.
+* **Trade-off:** The total time to process 100 resumes is technically longer. However, we protect the server's RAM (avoiding *Out of Memory* crashes), while the interleaving logic ensures that multiple recruiters see their progress bars moving simultaneously in the interface.
 
-### 4. Gestão de Custos: Política de Retenção (24h TTL)
-* **Decisão:** Implementamos o relacionamento do banco com `cascade="all, delete-orphan"`, preparando o terreno para um *Garbage Collector* que deleta jobs mais velhos que 24 horas.
-* **Trade-off:** Os dados não são retidos para sempre, exigindo que o usuário baixe os resultados (CSV/JSON) no mesmo dia. O ganho é manter o uso de disco próximo de zero, garantindo a viabilidade do banco de dados gratuito a longo prazo e adotando o princípio de *Privacy by Design* (LGPD).
+### 4. Cost Management: Retention Policy (24h TTL)
+* **Decision:** We implemented the database relationship with `cascade="all, delete-orphan"`, laying the groundwork for a *Garbage Collector* that deletes jobs older than 24 hours.
+* **Trade-off:** Data is not retained forever, requiring the user to download results (CSV/JSON) on the same day. The benefit is keeping disk usage near zero, ensuring the long-term viability of the free database tier and adopting the *Privacy by Design* principle (LGPD).
 
 ### 5. ORM: Async SQLAlchemy + Alembic
-* **Decisão:** Utilizamos o driver `asyncpg` para operações não bloqueantes no banco de dados.
-* **Trade-off:** A configuração de testes automatizados (`pytest`) se torna mais complexa devido ao loop de eventos assíncrono, mas a API se torna imensamente mais resiliente ao tráfego simultâneo.
+* **Decision:** We use the `asyncpg` driver for non-blocking database operations.
+* **Trade-off:** Automated test configuration (`pytest`) becomes more complex due to the asynchronous event loop, but the API becomes immensely more resilient to simultaneous traffic.
 
 ---
 
