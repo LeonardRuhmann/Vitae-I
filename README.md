@@ -63,7 +63,10 @@ curl -X POST "http://localhost:8000/analyze" \
 | Frontend    | [Streamlit](https://streamlit.io/)           |
 | Backend API | [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) |
 | NLP Engine  | [spaCy](https://spacy.io/) `pt_core_news_lg` |
+| Database    | [PostgreSQL 17](https://www.postgresql.org/) + [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (async) |
+| Migrations  | [Alembic](https://alembic.sqlalchemy.org/)   |
 | PDF Parsing | [pypdf](https://pypdf.readthedocs.io/)       |
+| Infra       | [Docker Compose](https://docs.docker.com/compose/) |
 | Language    | Python 3.10+                                 |
 
 ---
@@ -72,6 +75,7 @@ curl -X POST "http://localhost:8000/analyze" \
 
 - Python **3.10 or higher**
 - `pip` and `venv`
+- **Docker** and **Docker Compose** (for PostgreSQL)
 - ~600 MB free disk space (for the spaCy Portuguese NLP model)
 
 ---
@@ -80,7 +84,7 @@ curl -X POST "http://localhost:8000/analyze" \
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/vitae-i.git
+git clone https://github.com/LeonardRuhmann/Vitae-I.git
 cd vitae-i
 
 # 2. Create and activate a virtual environment
@@ -89,6 +93,13 @@ source venv/bin/activate
 
 # 3. Install all dependencies
 pip install -r requirements.txt
+
+# 4. Set up environment variables
+cp .env.example .env
+
+# 5. Start PostgreSQL and run the database migration
+sudo docker-compose up -d
+alembic upgrade head
 ```
 
 > The `requirements.txt` includes the `pt_core_news_lg` spaCy model directly from its GitHub release URL, so no separate `spacy download` command is needed.
@@ -134,8 +145,12 @@ cp .env.example .env
 | Variable | Default | Description |
 |---|---|---|
 | `VITAE_API_URL` | `http://127.0.0.1:8000/analyze` | URL of the FastAPI backend |
+| `POSTGRES_USER` | `vitae` | PostgreSQL username (used by Docker Compose) |
+| `POSTGRES_PASSWORD` | `vitae_secret` | PostgreSQL password (used by Docker Compose) |
+| `POSTGRES_DB` | `vitae_db` | PostgreSQL database name (used by Docker Compose) |
+| `DATABASE_URL` | `postgresql+asyncpg://vitae:vitae_secret@localhost:5432/vitae_db` | Async SQLAlchemy connection string |
 
-The application reads `VITAE_API_URL` at startup via `os.environ.get()`. Local development works with no `.env` file at all — the default value is used automatically.
+Local development works with no `.env` file at all — sensible defaults are used automatically.
 
 ### Running tests
 
@@ -172,13 +187,45 @@ Separation of concerns. The API can be consumed independently, tested in isolati
 ### Why load the spaCy model via FastAPI's `lifespan`?
 The model is loaded once at server startup using a `lifespan` context manager and stored in `app.state.nlp`. The alternative — a bare global variable — loads the model as a side-effect of importing the module, which makes startup order unpredictable, harder to test, and impossible to mock cleanly. The `lifespan` approach gives explicit control over when the model loads and frees up the shutdown hook for future cleanup logic.
 
+### Why PostgreSQL + asyncpg instead of SQLite?
+The application runs on FastAPI with an async event loop. Using a synchronous driver like `psycopg2` or SQLite would block the loop on every DB call, killing concurrency. `asyncpg` is the fastest async PostgreSQL driver available and pairs natively with SQLAlchemy 2.0's `AsyncSession`. PostgreSQL also provides `gen_random_uuid()` for server-side UUID generation and native `JSON` columns — both used heavily in the data model.
+
+### Why SQLAlchemy 2.0 style (`Mapped` / `mapped_column`)?
+The 2.0 API enforces strict type annotations at the model level, which catches schema mismatches at development time rather than at runtime. It also plays well with modern Python tooling (mypy, IDEs) and is the officially recommended approach going forward.
+
 ### Why use `set` for skill and entity deduplication?
 The entity loop originally used `list` and checked membership with `ent.text not in list` — an O(N) operation inside a loop. Because Python `set` is backed by a hash table, membership checks are O(1). `skills` and `info` are sets during extraction and converted to `list` only at return time for JSON serialization. The `people` collection stays a `list` since it holds at most one item.
 
 ### What I'd do differently
 - Add an async job queue (Celery or ARQ) for handling many simultaneous uploads without blocking.
 - Add a fine-tuned training set for Brazilian tech skills and company names to reduce reliance on the `config.py` dictionaries.
-- Replace the `INVALID_WORDS` blacklist with a proper classifier to filter noise — the blacklist is brittle and requires maintenance.
+- Replace the structured blacklist system (`SECTION_HEADERS`, `DEGREE_KEYWORDS`, `NOISE_WORDS`, `CONTACT_KEYWORDS` unified into `INVALID_WORDS`) with a proper classifier to filter noise — the set-based approach is brittle and requires manual maintenance.
+
+---
+
+## ⚖️ Engineering Trade-offs
+
+Para garantir que o **Vitae-I** seja escalável, ágil e viável para ser hospedado em *Free Tiers* (servidores gratuitos com recursos limitados), as seguintes decisões de engenharia foram tomadas:
+
+### 1. Autenticação: Session-based UUID vs. Sistema Completo de Login
+* **Decisão:** O sistema utiliza um UUID temporário gerado no frontend (armazenado em *localStorage*) como `user_id`, em vez de um sistema tradicional de contas (JWT/OAuth).
+* **Trade-off:** Abrimos mão da persistência cross-device (o usuário não vê o mesmo lote no celular e no PC) para focar 100% no MVP e na UX sem atritos. Isso evitou o inchaço de escopo (*Scope Creep*) de construir fluxos de recuperação de senha e e-mail na Fase 1.
+
+### 2. Armazenamento: PostgreSQL + Colunas JSON nativas
+* **Decisão:** As entidades extraídas pelo modelo de IA (Skills, Pessoas, Localizações) são salvas diretamente em colunas do tipo `JSON` no PostgreSQL, em vez de tabelas relacionais separadas.
+* **Trade-off:** Perdemos um pouco de rigidez e validação de chaves estrangeiras para essas tags específicas. Em troca, ganhamos extrema flexibilidade: se o modelo NLP for atualizado para extrair novas categorias de dados amanhã, o banco de dados aceita imediatamente, sem necessidade de novas *Migrations*.
+
+### 3. Concorrência: Intercalação Justa com `asyncio.Semaphore(1)`
+* **Decisão:** O processamento em lote não é paralelizado de forma agressiva. Limitamos a extração síncrona do modelo spaCy a 1 documento por vez globalmente, usando Threads.
+* **Trade-off:** O tempo total para processar 100 currículos é tecnicamente maior. No entanto, protegemos a memória RAM do servidor (evitando crashes por *Out of Memory*), enquanto a lógica de intercalação garante que múltiplos recrutadores vejam suas barras de progresso andando simultaneamente na interface.
+
+### 4. Gestão de Custos: Política de Retenção (24h TTL)
+* **Decisão:** Implementamos o relacionamento do banco com `cascade="all, delete-orphan"`, preparando o terreno para um *Garbage Collector* que deleta jobs mais velhos que 24 horas.
+* **Trade-off:** Os dados não são retidos para sempre, exigindo que o usuário baixe os resultados (CSV/JSON) no mesmo dia. O ganho é manter o uso de disco próximo de zero, garantindo a viabilidade do banco de dados gratuito a longo prazo e adotando o princípio de *Privacy by Design* (LGPD).
+
+### 5. ORM: Async SQLAlchemy + Alembic
+* **Decisão:** Utilizamos o driver `asyncpg` para operações não bloqueantes no banco de dados.
+* **Trade-off:** A configuração de testes automatizados (`pytest`) se torna mais complexa devido ao loop de eventos assíncrono, mas a API se torna imensamente mais resiliente ao tráfego simultâneo.
 
 ---
 
