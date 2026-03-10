@@ -166,7 +166,7 @@ pytest tests/
 
 The frontend and backend are **fully decoupled**. The Streamlit app is just an HTTP client — the API can be used independently by any other consumer (a CLI tool, another web app, etc.).
 
-> 📖 **Detailed documentation:** [Fase 2 — Batch Processing & Arquitetura de Produção](./docs/fase-2-batch-processing.md) — trade-offs, decisões de arquitetura e débitos técnicos.
+> 📖 **Detailed documentation:** [Batch Processing & Production Architecture](./docs/fase-2-batch-processing.md) — trade-offs, architecture decisions, and technical debts.
 
 The NLP pipeline uses a **hybrid approach**:
 1. **Rule-based Entity Ruler** runs *before* the neural NER, injecting high-confidence entities from the curated `config.py` dictionaries (skills, orgs, locations).

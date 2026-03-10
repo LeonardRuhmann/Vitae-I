@@ -1,25 +1,25 @@
-# Fase 2 — Batch Processing & Arquitetura de Produção
+# Phase 2 — Batch Processing & Production Architecture
 
-> **Data**: 2026-03-10  
-> **Status**: Implementado  
+> **Date**: 2026-03-10  
+> **Status**: Implemented  
 > **Migration**: `ed0b08ebec92` (add error tracking to resume results)
 
 ---
 
-## 1. Visão Geral
+## 1. Overview
 
-Evolução do endpoint `/analyze` (single-file, síncrono) para suportar **upload em lote** de até 10 currículos por requisição, com processamento assíncrono em background e disaster recovery automático.
+Evolution from the single-file, synchronous `/analyze` endpoint to support **batch upload** of up to 10 resumes per request, with asynchronous background processing and automatic disaster recovery.
 
-### Arquitetura Resumida
+### Architecture Summary
 
 ```
-Cliente                          Servidor (Free Tier)
-───────                          ────────────────────
-POST /upload-batch ──────► Validação (max 10, PDF only)
+Client                           Server (Free Tier)
+──────                           ──────────────────
+POST /upload-batch ──────► Validation (max 10, PDF only)
   - X-Session-ID                      │
   - files[]                           ▼
-                              Salva PDFs em /tmp/
-                              Cria BatchJob (PROCESSING)
+                              Save PDFs to /tmp/
+                              Create BatchJob (PROCESSING)
   ◄── HTTP 202 { job_id }            │
                                       ▼
                               BackgroundTask → process_batch()
@@ -27,110 +27,110 @@ POST /upload-batch ──────► Validação (max 10, PDF only)
                                  │  asyncio.to_thread(nlp, text)  │
                                  └──────────────────┘
                                       │
-                              Para cada PDF:
+                              For each PDF:
                                 try → ResumeResult(SUCCESS)
                                 except → ResumeResult(FAILED)
-                                finally → deleta PDF, incrementa counter
+                                finally → delete PDF, increment counter
                                       │
                               BatchJob.status = COMPLETED
 ```
 
 ---
 
-## 2. Decisões de Arquitetura
+## 2. Architecture Decisions
 
 ### 2.1 Background Processing: `BackgroundTasks` + `asyncio.to_thread()`
 
-**Alternativas consideradas:**
+**Alternatives considered:**
 
-| Opção | Descartada porque |
+| Option | Discarded because |
 |---|---|
-| Celery + Redis | Adiciona 2 dependências pesadas; inviável em Free Tier |
-| `asyncio.create_task()` puro | spaCy é CPU-bound — bloquearia o Event Loop |
-| `ProcessPoolExecutor` | Duplica o modelo spaCy na RAM (~500MB) por worker |
+| Celery + Redis | Adds 2 heavy dependencies; not viable on Free Tier |
+| Pure `asyncio.create_task()` | spaCy is CPU-bound — would block the Event Loop |
+| `ProcessPoolExecutor` | Duplicates the spaCy model in RAM (~500MB) per worker |
 
-**Decisão**: `BackgroundTasks` (nativo do FastAPI) com `asyncio.to_thread()` para offload da chamada síncrona do spaCy. O `Semaphore(1)` garante que apenas uma inferência NLP roda por vez, protegendo CPU e RAM.
+**Decision**: `BackgroundTasks` (native to FastAPI) with `asyncio.to_thread()` to offload the synchronous spaCy call. The `Semaphore(1)` ensures only one NLP inference runs at a time, protecting CPU and RAM.
 
-**Trade-off**: Se o processo da API morrer, os Background Tasks em andamento são **perdidos**. Isso é mitigado pelo Disaster Recovery (seção 2.4).
-
----
-
-### 2.2 Armazenamento Temporário em Disco
-
-Os PDFs são salvos em `/tmp/vitae_uploads/{job_id}/` antes do processamento.
-
-**Por quê?**
-- **Economia de RAM**: Evita manter N PDFs em memória simultaneamente
-- **Resiliência intra-processo**: Se um PDF travar, os outros ainda estão no disco
-
-**Trade-off**: Em Free Tier, o disco é **efêmero** — formatado a cada reinicialização do contêiner. Os PDFs servem apenas para economia de RAM durante a vida do processo, **não para recovery cross-restart**.
+**Trade-off**: If the API process dies, in-flight Background Tasks are **lost**. This is mitigated by Disaster Recovery (section 2.4).
 
 ---
 
-### 2.3 Status por Arquivo (`ResultStatus`)
+### 2.2 Ephemeral Disk Storage
 
-Cada `ResumeResult` tem seu próprio `status` (SUCCESS/FAILED) e `error_message`. O `BatchJob` final é sempre marcado como `COMPLETED` quando o loop termina, independente de quantos arquivos falharam individualmente.
+Uploaded PDFs are saved to `/tmp/vitae_uploads/{job_id}/` before processing.
 
-**Por quê?** `COMPLETED` significa "o job terminou de processar", não "tudo deu certo". O status por arquivo dá granularidade ao frontend para mostrar quais currículos precisam ser reenviados.
+**Why?**
+- **RAM efficiency**: Avoids keeping N PDFs in memory simultaneously
+- **Intra-process resilience**: If one PDF crashes, the others are still on disk
 
----
-
-### 2.4 Disaster Recovery ("Aceitar a Perda")
-
-No `lifespan` (startup) da API, todos os `BatchJob` com status `PENDING` ou `PROCESSING` são marcados como `FAILED`.
-
-**Premissa**: O disco do Free Tier é formatado a cada restart. Não há PDFs para reprocessar. A estratégia é **aceitar a perda** e notificar o frontend, que avisa o usuário para reenviar.
-
-**Trade-off**: Jobs parcialmente processados antes do crash terão alguns `ResumeResult` salvos e outros não. O frontend deve tratar `FAILED` como "lote incompleto — reenvie".
+**Trade-off**: On Free Tier, the disk is **ephemeral** — wiped on every container restart. The PDFs only serve as RAM relief during the process lifetime, **not for cross-restart recovery**.
 
 ---
 
-### 2.5 Autenticação Pragmática (`X-Session-ID`)
+### 2.3 Per-File Status (`ResultStatus`)
 
-O `user_id` é extraído do header `X-Session-ID` sem nenhuma validação de autenticidade.
+Each `ResumeResult` has its own `status` (SUCCESS/FAILED) and `error_message`. The parent `BatchJob` is always marked `COMPLETED` when the loop finishes, regardless of how many individual files failed.
 
-**Riscos aceitos:**
-- Qualquer cliente pode forjar qualquer `user_id`
-- Sem isolamento real entre usuários
-
-**Justificativa**: Para MVP/portfólio, autenticação real (JWT, OAuth) adicionaria complexidade desproporcional ao valor entregue. Este é o débito técnico mais significativo da Fase 2.
+**Why?** `COMPLETED` means "the job finished processing", not "everything succeeded". The per-file status gives the frontend granularity to show which resumes need to be re-uploaded.
 
 ---
 
-## 3. Débitos Técnicos
+### 2.4 Disaster Recovery ("Accept the Loss")
 
-| # | Débito | Severidade | Quando resolver |
+On API startup (via `lifespan`), all `BatchJob` records with status `PENDING` or `PROCESSING` are marked as `FAILED`.
+
+**Premise**: Free Tier disk is wiped on every restart. There are no PDFs to reprocess. The strategy is to **accept the loss** and notify the frontend, which tells the user to re-upload.
+
+**Trade-off**: Jobs partially processed before a crash will have some `ResumeResult` entries saved and others missing. The frontend should treat `FAILED` as "incomplete batch — please re-upload".
+
+---
+
+### 2.5 Pragmatic Authentication (`X-Session-ID`)
+
+The `user_id` is extracted from the `X-Session-ID` header with no authenticity validation.
+
+**Accepted risks:**
+- Any client can forge any `user_id`
+- No real isolation between users
+
+**Justification**: For an MVP/portfolio project, real authentication (JWT, OAuth) would add disproportionate complexity relative to the value delivered. This is the most significant technical debt from Phase 2.
+
+---
+
+## 3. Technical Debts
+
+| # | Debt | Severity | When to address |
 |---|---|---|---|
-| **DT-01** | `X-Session-ID` sem autenticação real | 🔴 Alta | Antes de produção com dados reais |
-| **DT-02** | `api.py` concentra endpoint, processing engine e lifespan (~350 linhas) | 🟡 Média | Quando atingir ~500 linhas, extrair para `routes/`, `services/` |
-| **DT-03** | Sem endpoint de consulta de status do job (`GET /jobs/{id}`) | 🟡 Média | Fase 3 (frontend polling) |
-| **DT-04** | Testes de integração (com banco real) não implementados | 🟡 Média | Quando CI/CD for configurado |
-| **DT-05** | Sem rate limiting por `user_id` | 🟢 Baixa | Quando houver múltiplos usuários reais |
-| **DT-06** | Sem paginação para listar resultados de um job | 🟢 Baixa | Quando lotes maiores que 10 forem suportados |
+| **TD-01** | `X-Session-ID` with no real authentication | 🔴 High | Before production with real data |
+| **TD-02** | `api.py` bundles endpoint, processing engine, and lifespan (~350 lines) | 🟡 Medium | When it exceeds ~500 lines, extract into `routes/`, `services/` |
+| **TD-03** | No job status query endpoint (`GET /jobs/{id}`) | 🟡 Medium | Phase 3 (frontend polling) |
+| **TD-04** | Integration tests (with real DB) not implemented | 🟡 Medium | When CI/CD is configured |
+| **TD-05** | No rate limiting per `user_id` | 🟢 Low | When there are multiple real users |
+| **TD-06** | No pagination for listing job results | 🟢 Low | When batches larger than 10 are supported |
 
 ---
 
-## 4. Arquivos Modificados
+## 4. Files Modified
 
-| Arquivo | O que mudou |
+| File | What changed |
 |---|---|
-| `db/models.py` | Adicionado `ResultStatus` enum; colunas `status` e `error_message` em `ResumeResult` |
-| `api.py` | Disaster Recovery no lifespan; endpoint `POST /upload-batch`; `process_batch()` engine |
-| `tests/test_api.py` | 4 novos testes (missing session ID, exceeds limit, non-PDF, success) |
-| `alembic/versions/ed0b08ebec92_*.py` | Migration com criação de enums PostgreSQL e conversão VARCHAR→enum |
+| `db/models.py` | Added `ResultStatus` enum; `status` and `error_message` columns on `ResumeResult` |
+| `api.py` | Disaster Recovery in lifespan; `POST /upload-batch` endpoint; `process_batch()` engine |
+| `tests/test_api.py` | 4 new tests (missing session ID, exceeds limit, non-PDF, success) |
+| `alembic/versions/ed0b08ebec92_*.py` | Migration with PostgreSQL enum creation and VARCHAR→enum conversion |
 
 ---
 
-## 5. Como Testar
+## 5. How to Test
 
 ```bash
-# Unit tests (sem banco)
+# Unit tests (no database required)
 pytest tests/test_api.py -v
 
-# Smoke test manual (com banco)
+# Manual smoke test (with database)
 uvicorn api:app --reload
 curl -X POST http://localhost:8000/upload-batch \
   -H "X-Session-ID: test-user" \
-  -F "files=@curriculo.pdf"
-# Esperado: HTTP 202 {"job_id": "..."}
+  -F "files=@resume.pdf"
+# Expected: HTTP 202 {"job_id": "..."}
 ```
