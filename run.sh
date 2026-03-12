@@ -36,9 +36,17 @@ ensure_venv() {
         success "Virtual environment created at $VENV_DIR"
     fi
 
-    info "Checking dependencies..."
-    "$VENV_PIP" install -r "$SCRIPT_DIR/requirements.txt" --quiet
-    success "Dependencies are up to date."
+    MARKER="$VENV_DIR/.req_hash"
+    CURRENT_HASH=$(md5sum "$SCRIPT_DIR/requirements.txt" | cut -d ' ' -f 1)
+
+    if [ ! -f "$MARKER" ] || [ "$(cat "$MARKER")" != "$CURRENT_HASH" ]; then
+        info "Changes detected in requirements.txt. Installing dependencies..."
+        "$VENV_PIP" install -r "$SCRIPT_DIR/requirements.txt" --quiet
+        echo "$CURRENT_HASH" > "$MARKER"
+        success "Dependencies are installed and up to date."
+    else
+        info "Dependencies are already installed and up to date. Skipping."
+    fi
 }
 
 # ── Commands ─────────────────────────────────────────────────
