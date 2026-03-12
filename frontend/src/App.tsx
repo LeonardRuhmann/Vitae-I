@@ -1,5 +1,6 @@
 import { AppBar, Toolbar, Typography, Container, Box } from '@mui/material'
 import BatchPredictionIcon from '@mui/icons-material/BatchPrediction'
+import DropzoneArea from './components/DropzoneArea'
 
 function App() {
   return (
@@ -20,18 +21,8 @@ function App() {
           Workspace
         </Typography>
         
-        <Box sx={{ 
-          p: 6, 
-          mt: 4, 
-          borderRadius: 2, 
-          bgcolor: 'background.paper',
-          border: '1px dashed',
-          borderColor: 'divider',
-          textAlign: 'center'
-        }}>
-          <Typography color="text.secondary">
-            Drag and drop area will be implemented in Phase 4.2
-          </Typography>
+        <Box sx={{ mt: 4 }}>
+          <DropzoneArea />
         </Box>
       </Container>
     </Box>
