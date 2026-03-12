@@ -13,8 +13,11 @@ from fastapi import (
     HTTPException,
     Request,
     UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
 )
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 
 from config import (
     API_TITLE,
@@ -38,6 +41,45 @@ MAX_BATCH_SIZE = 10
 
 # Semaphore: allow only 1 concurrent spaCy call to protect CPU / RAM.
 _processing_semaphore = asyncio.Semaphore(1)
+
+
+# ---------------------------------------------------------------------------
+# WebSocket Connection Manager
+# ---------------------------------------------------------------------------
+class ConnectionManager:
+    def __init__(self):
+        # Maps job_id -> list of active connections
+        self.active_connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, job_id: str):
+        await websocket.accept()
+        if job_id not in self.active_connections:
+            self.active_connections[job_id] = []
+        self.active_connections[job_id].append(websocket)
+        logger.debug("WebSocket connected to job '%s'. Active: %d", job_id, len(self.active_connections[job_id]))
+
+    def disconnect(self, websocket: WebSocket, job_id: str):
+        if job_id in self.active_connections:
+            try:
+                self.active_connections[job_id].remove(websocket)
+                logger.debug("WebSocket disconnected from job '%s'.", job_id)
+                if not self.active_connections[job_id]:
+                    del self.active_connections[job_id]
+            except ValueError:
+                pass
+
+    async def broadcast_to_job(self, job_id: str, message: dict):
+        if job_id in self.active_connections:
+            # Create a copy of the list to iterate over safely
+            connections = list(self.active_connections[job_id])
+            for connection in connections:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    logger.error("Failed to send WebSocket message for job %s: %s", job_id, e)
+                    self.disconnect(connection, job_id)
+
+manager = ConnectionManager()
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +285,8 @@ async def process_batch(
     nlp: spacy.Language,
 ) -> None:
     """Process every PDF in the batch, saving results one-by-one."""
+    total_files = len(file_paths)
+    processed_count = 0
 
     for original_name, path in file_paths:
         try:
@@ -291,6 +335,9 @@ async def process_batch(
                     )
                 )
                 await session.commit()
+            
+            # Local status tracking for WebSocket
+            current_status = ResultStatus.SUCCESS
 
         except Exception as exc:
             logger.error(
@@ -314,6 +361,9 @@ async def process_batch(
                     )
                 )
                 await session.commit()
+            
+            # Local status tracking for WebSocket
+            current_status = ResultStatus.FAILED
 
         finally:
             # Clean up temp file
@@ -322,14 +372,29 @@ async def process_batch(
             except OSError:
                 pass
 
-            # Increment processed counter
+            # Increment local counter
+            processed_count += 1
+
+            # Update DB processed counter
             async with async_session() as session:
                 await session.execute(
                     update(BatchJob)
                     .where(BatchJob.id == job_id)
-                    .values(processed_files=BatchJob.processed_files + 1)
+                    .values(processed_files=processed_count)
                 )
                 await session.commit()
+            
+            # Broadcast progress event to WebSockets
+            await manager.broadcast_to_job(
+                str(job_id),
+                {
+                    "type": "progress",
+                    "processed_files": processed_count,
+                    "total_files": total_files,
+                    "latest_file": original_name,
+                    "status": current_status.value,
+                }
+            )
 
     # --- All files processed → mark job as COMPLETED ---
     async with async_session() as session:
@@ -339,6 +404,15 @@ async def process_batch(
             .values(status=JobStatus.COMPLETED)
         )
         await session.commit()
+    
+    # Broadcast completion event to WebSockets
+    await manager.broadcast_to_job(
+        str(job_id),
+        {
+            "type": "completed",
+            "job_id": str(job_id)
+        }
+    )
 
     # Clean up empty job directory
     job_dir = UPLOAD_DIR / str(job_id)
@@ -348,3 +422,59 @@ async def process_batch(
         pass
 
     logger.info("Job %s completed.", job_id)
+
+
+# ---------------------------------------------------------------------------
+# WebSocket Endpoint (Phase 3.5)
+# ---------------------------------------------------------------------------
+@app.websocket("/ws/jobs/{job_id}")
+async def websocket_job_status(websocket: WebSocket, job_id: str):
+    """Real-time progress updates for a specific batch job."""
+    await manager.connect(websocket, job_id)
+    try:
+        while True:
+            # Keep connection alive, wait for client messages if any
+            # (Though currently we only push from server to client)
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, job_id)
+
+
+# ---------------------------------------------------------------------------
+# REST Results Endpoint (Phase 3.5)
+# ---------------------------------------------------------------------------
+@app.get("/jobs/{job_id}")
+async def get_job_results(job_id: uuid.UUID):
+    """Fetch the final results for a completed batch job."""
+    async with async_session() as session:
+        # Eager load the results using selectinload
+        result = await session.execute(
+            select(BatchJob)
+            .options(selectinload(BatchJob.results))
+            .where(BatchJob.id == job_id)
+        )
+        job = result.scalars().first()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Build response payload
+    results_payload = [
+        {
+            "file_name": r.file_name,
+            "status": r.status.value,
+            "error_message": r.error_message,
+            "skills": r.skills,
+            "people": r.people,
+            "info": r.info,
+        }
+        for r in job.results
+    ]
+
+    return {
+        "job_id": str(job.id),
+        "status": job.status.value,
+        "total_files": job.total_files,
+        "processed_files": job.processed_files,
+        "results": results_payload,
+    }
