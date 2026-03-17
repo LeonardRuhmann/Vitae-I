@@ -169,7 +169,7 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |---|---|---|
-| `VITAE_API_URL` | `http://127.0.0.1:8000/analyze` | URL of the FastAPI backend |
+| `VITE_API_URL` | `http://localhost:8000` | Backend URL used by the React frontend (Vite injects at build time) |
 | `POSTGRES_USER` | `vitae` | PostgreSQL username (used by Docker Compose) |
 | `POSTGRES_PASSWORD` | `vitae_secret` | PostgreSQL password (used by Docker Compose) |
 | `POSTGRES_DB` | `vitae_db` | PostgreSQL database name (used by Docker Compose) |

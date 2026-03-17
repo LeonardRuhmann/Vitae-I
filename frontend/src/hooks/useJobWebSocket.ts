@@ -27,8 +27,10 @@ export function useJobWebSocket(jobId: string | null) {
       return;
     }
 
-    // Initialize WebSocket
-    const ws = new WebSocket(`ws://localhost:8000/ws/jobs/${jobId}`);
+    // Initialize WebSocket — derive WS URL from the API base URL
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const wsBase = apiBase.replace(/^http/, 'ws');
+    const ws = new WebSocket(`${wsBase}/ws/jobs/${jobId}`);
 
     ws.onopen = () => {
       console.log(`WebSocket connected for job ${jobId}`);
