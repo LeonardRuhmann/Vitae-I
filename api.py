@@ -16,6 +16,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
@@ -149,6 +150,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------------------------------------------------------------

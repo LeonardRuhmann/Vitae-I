@@ -18,7 +18,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 const MAX_FILES = 10;
 
-export default function DropzoneArea() {
+interface DropzoneAreaProps {
+  onProcess: (files: File[]) => void;
+  disabled: boolean;
+}
+
+export default function DropzoneArea({ onProcess, disabled }: DropzoneAreaProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -58,6 +63,7 @@ export default function DropzoneArea() {
       'application/pdf': ['.pdf'],
     },
     maxFiles: MAX_FILES,
+    disabled: disabled,
   });
 
   const removeFile = (nameToRemove: string) => {
@@ -66,8 +72,7 @@ export default function DropzoneArea() {
   };
 
   const handleProcess = () => {
-    console.log("Preparing to send files to API:", files);
-    // TODO: Implement Phase 4.3 POST request here
+    onProcess(files);
   };
 
   // Dynamic styling based on drag state
@@ -159,10 +164,10 @@ export default function DropzoneArea() {
           color="primary"
           size="large"
           onClick={handleProcess}
-          disabled={files.length === 0 || files.length > MAX_FILES}
+          disabled={disabled || files.length === 0 || files.length > MAX_FILES}
           sx={{ fontWeight: 600, px: 4 }}
         >
-          Process Batch
+          {disabled ? 'Processing...' : 'Process Batch'}
         </Button>
       </Box>
     </Box>

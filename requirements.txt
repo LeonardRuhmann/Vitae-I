@@ -79,3 +79,4 @@ wasabi==1.1.3
 watchdog==6.0.0
 weasel==0.4.3
 wrapt==2.0.1
+websockets>=12.0
