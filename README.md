@@ -6,12 +6,12 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-teal?logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.53-red?logo=streamlit)](https://streamlit.io/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
 [![spaCy](https://img.shields.io/badge/spaCy-3.8-09a3d5?logo=spacy)](https://spacy.io/)
-[![Version](https://img.shields.io/badge/version-v1.0.6-orange.svg)](#)
+[![Version](https://img.shields.io/badge/version-v2.0.0-orange.svg)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Upload a PDF resume and get an instant AI-powered breakdown of the candidate's skills, identity, and key background — no manual reading required.
+Upload up to 10 PDF resumes at once and get an instant AI-powered breakdown of each candidate's skills, identity, and key background — with real-time progress tracking via WebSockets.
 
 </div>
 
@@ -29,28 +29,44 @@ The project was built with the Brazilian job market in mind, where most resumes 
 
 ## 📸 Demo
 
-> **Upload a Resume → Get Structured Intelligence**
+> **Drag & Drop Resumes → Watch Real-Time Progress → Get Structured Intelligence**
 
 ```
-1. Open the Streamlit dashboard at http://localhost:8501
-2. Upload any PDF resume
-3. Click "Analyze Resume"
+1. Open the React frontend at http://localhost:5173
+2. Drag & drop up to 10 PDF resumes (or click to select)
+3. Click "Process Batch"
+4. Watch the real-time progress bar as each resume is analyzed
+5. View extracted skills, people, and entities in the results panel
 ```
 
-**API Example (direct call):**
+**Batch API Example (direct call):**
 ```bash
-curl -X POST "http://localhost:8000/analyze" \
-     -H "accept: application/json" \
-     -F "file=@resume.pdf"
+curl -X POST "http://localhost:8000/upload-batch" \
+     -H "X-Session-ID: my-session-123" \
+     -F "files=@resume1.pdf" \
+     -F "files=@resume2.pdf"
+# Returns: {"job_id": "uuid-here"}
 ```
 
-**API Response:**
+**Results API:**
+```bash
+curl "http://localhost:8000/jobs/{job_id}"
+```
 ```json
 {
-  "text_preview": "Leonardo Ruhmann. Desenvolvedor Full Stack...",
-  "skills": ["Python", "React", "FastAPI", "Docker", "PostgreSQL"],
-  "people": ["Leonardo Ruhmann"],
-  "info": ["Universidade de Brasília", "Rio de Janeiro"]
+  "job_id": "1c0ecf4d-8a09-470a-bc12-13c3b57962e1",
+  "status": "COMPLETED",
+  "total_files": 2,
+  "processed_files": 2,
+  "results": [
+    {
+      "file_name": "resume1.pdf",
+      "status": "SUCCESS",
+      "skills": ["Python", "React", "FastAPI"],
+      "people": ["Leonardo Ruhmann"],
+      "info": ["Universidade de Brasília"]
+    }
+  ]
 }
 ```
 
@@ -60,14 +76,16 @@ curl -X POST "http://localhost:8000/analyze" \
 
 | Layer       | Technology                                   |
 |-------------|----------------------------------------------|
-| Frontend    | [Streamlit](https://streamlit.io/)           |
+| Frontend    | [React 18](https://react.dev/) + [Vite](https://vite.dev/) + [Material UI](https://mui.com/) (TypeScript) |
 | Backend API | [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) |
+| Real-Time   | WebSockets (native FastAPI + browser API)    |
 | NLP Engine  | [spaCy](https://spacy.io/) `pt_core_news_lg` |
 | Database    | [PostgreSQL 17](https://www.postgresql.org/) + [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (async) |
 | Migrations  | [Alembic](https://alembic.sqlalchemy.org/)   |
 | PDF Parsing | [pypdf](https://pypdf.readthedocs.io/)       |
+| HTTP Client | [Axios](https://axios-http.com/)             |
 | Infra       | [Docker Compose](https://docs.docker.com/compose/) |
-| Language    | Python 3.10+                                 |
+| Languages   | Python 3.10+ / TypeScript 5+                |
 
 ---
 
@@ -75,6 +93,7 @@ curl -X POST "http://localhost:8000/analyze" \
 
 - Python **3.10 or higher**
 - `pip` and `venv`
+- **Node.js 18+** and **npm** (for the React frontend)
 - **Docker** and **Docker Compose** (for PostgreSQL)
 - ~600 MB free disk space (for the spaCy Portuguese NLP model)
 
@@ -91,18 +110,22 @@ cd vitae-i
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Install all dependencies
+# 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 4. Set up environment variables
+# 4. Install frontend dependencies
+cd frontend && npm install && cd ..
+
+# 5. Set up environment variables
 cp .env.example .env
 
-# 5. Start PostgreSQL and run the database migration
+# 6. Start PostgreSQL and run the database migration
 sudo docker-compose up -d
 alembic upgrade head
 ```
 
 > The `requirements.txt` includes the `pt_core_news_lg` spaCy model directly from its GitHub release URL, so no separate `spacy download` command is needed.
+> The `run.sh` script automates steps 2–4 automatically on first run.
 
 ---
 
@@ -118,8 +141,10 @@ chmod +x run.sh
 ```
 
 This will start:
-- The **API** at `http://localhost:8000`
-- The **Frontend** at `http://localhost:8501`
+- The **FastAPI backend** at `http://localhost:8000` (with `--reload`)
+- The **React frontend** at `http://localhost:5173` (Vite dev server)
+
+The script automatically provisions the Python `venv`, installs `pip` dependencies (hash-based change detection), and runs `npm install` if `node_modules/` is missing.
 
 ### Run individually
 
@@ -162,11 +187,44 @@ pytest tests/
 ---
 
 ## 🏗️ Architecture
-![Vitae-I System Architecture](./docs/architecture-diagram-v1.0.png)
 
-The frontend and backend are **fully decoupled**. The Streamlit app is just an HTTP client — the API can be used independently by any other consumer (a CLI tool, another web app, etc.).
+The system is a **fullstack application** with a clear separation of concerns across three layers:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  FRONTEND (React + Vite + Material UI)       :5173           │
+│  ┌────────────┐  ┌──────────────┐  ┌───────────────────┐     │
+│  │ DropzoneArea│  │ App.tsx      │  │ ResultsView       │    │
+│  │ (Drag&Drop) ├─▶│ State Machine├─▶│ (Accordion+Chips) │   │
+│  └────────────┘  └──────┬───────┘  └───────────────────┘     │
+│                    Axios │ ▲ WebSocket                       │
+├──────────────────────────┼─┼────────────────────────────────-┤
+│  BACKEND (FastAPI + spaCy)│ │                    :8000       │
+│  ┌────────────────────┐  │ │  ┌───────────────────────┐     │
+│  │ POST /upload-batch  │◀─┘ │  │ ws://ws/jobs/{id}     │     │
+│  │ GET  /jobs/{id}     │    └──│ ConnectionManager     │     │
+│  └────────┬───────────┘       └───────────┬───────────┘     │
+│           │ BackgroundTasks               │ broadcast       │
+│  ┌────────▼───────────────────────────────▼──────────┐      │
+│  │ process_batch() — spaCy NLP + Semaphore(1)        │      │
+│  └────────────────────────┬──────────────────────────┘      │
+├───────────────────────────┼──────────────────────────────────┤
+│  DATABASE (PostgreSQL)    │                      :5432       │
+│  ┌────────────────────────▼──────────────────────────┐      │
+│  │ batch_jobs ──1:N──▶ resume_results                │      │
+│  └───────────────────────────────────────────────────┘      │
+└──────────────────────────────────────────────────────────────┘
+```
 
 > 📖 **Detailed documentation:** [Batch Processing & Production Architecture](./docs/fase-2-batch-processing.md) — trade-offs, architecture decisions, and technical debts.
+
+### Communication Flow
+
+1. **Upload (REST):** Frontend sends PDFs via `POST /upload-batch` → receives `job_id`
+2. **Processing (WebSocket):** Frontend opens `ws://localhost:8000/ws/jobs/{job_id}` and receives `progress` events in real-time as each resume is processed by spaCy
+3. **Results (REST):** On `completed` event, frontend calls `GET /jobs/{job_id}` to fetch the full payload with all extracted entities
+
+### NLP Pipeline
 
 The NLP pipeline uses a **hybrid approach**:
 1. **Rule-based Entity Ruler** runs *before* the neural NER, injecting high-confidence entities from the curated `config.py` dictionaries (skills, orgs, locations).
@@ -183,7 +241,10 @@ Speed and practicality. Resume analysis needs to be snappy and run local without
 ### Why a hybrid rule-based + neural approach?
 Skills like "React" or "FastAPI" are proper nouns but not famous enough for a general-purpose NER model to learn. A pure neural approach would miss most tech skills. Pure rule-based would miss candidate names. The hybrid approach gets the best of both worlds.
 
-### Why FastAPI instead of serving directly from Streamlit?
+### Why migrate from Streamlit to React?
+Streamlit was great for early prototyping, but it's a server-rendered Python framework — every interaction causes a full page rerun, there's no fine-grained state management, and it can't handle WebSockets natively. React + Vite gives us a proper SPA with a component-based architecture, TypeScript safety, client-side state machines, and native WebSocket support for real-time progress tracking. Material UI provides a polished, production-ready design system.
+
+### Why FastAPI as a standalone backend?
 Separation of concerns. The API can be consumed independently, tested in isolation, versioned, and swapped for a different frontend without any backend changes. It also enables future scaling (e.g., putting the API behind a queue if processing becomes heavy).
 
 ### Why load the spaCy model via FastAPI's `lifespan`?
