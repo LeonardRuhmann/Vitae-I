@@ -2,6 +2,7 @@ import io
 import sys
 import pytest
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 # Add parent directory to path to allow importing api module
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -15,9 +16,30 @@ def client():
     """
     Session-scoped TestClient that triggers the FastAPI lifespan on startup,
     populating app.state.nlp before any test runs.
+
+    The lifespan also runs Disaster Recovery, which requires a real DB.
+    We mock the async_session to avoid needing PostgreSQL for unit tests.
     """
-    with TestClient(app) as c:
-        yield c
+    with patch("api.async_session") as mock_session_maker:
+        # Mock the async context manager returned by async_session()
+        # Use MagicMock so sync methods like .add() don't return coroutines
+        mock_session = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_session_maker.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session
+        )
+        mock_session_maker.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        # The DR query returns no zombie jobs
+        # Note: .scalars() and .all() are SYNC methods on SQLAlchemy Result
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_result = MagicMock()
+        mock_result.scalars.return_value = mock_scalars
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        with TestClient(app) as c:
+            yield c
 
 
 def make_pdf(text: str) -> bytes:
@@ -52,6 +74,11 @@ def make_pdf(text: str) -> bytes:
     return pdf
 
 
+# ===================================================================
+# Original /analyze endpoint tests
+# ===================================================================
+
+
 def test_health_check():
     """Sanity check that pytest is set up correctly."""
     assert 1 + 1 == 2
@@ -59,7 +86,9 @@ def test_health_check():
 
 def test_analyze_skills(client):
     """Test if the model correctly finds 'Python' and 'Docker'."""
-    pdf_bytes = make_pdf("Leonardo Ruhmann. Desenvolvedor Python com experiencia em Docker.")
+    pdf_bytes = make_pdf(
+        "Leonardo Ruhmann. Desenvolvedor Python com experiencia em Docker."
+    )
     files = {"file": ("resume.pdf", io.BytesIO(pdf_bytes), "application/pdf")}
     response = client.post("/analyze", files=files)
 
@@ -84,3 +113,83 @@ def test_analyze_rejects_non_pdf(client):
     files = {"file": ("resume.txt", io.BytesIO(b"some text"), "text/plain")}
     response = client.post("/analyze", files=files)
     assert response.status_code == 400
+
+
+# ===================================================================
+# Batch upload endpoint tests  (Phase 2)
+# ===================================================================
+
+
+def test_upload_batch_missing_session_id(client):
+    """Upload without X-Session-ID header → 400."""
+    pdf = make_pdf("Test resume content")
+    response = client.post(
+        "/upload-batch",
+        files=[("files", ("cv.pdf", io.BytesIO(pdf), "application/pdf"))],
+    )
+    assert response.status_code == 400
+    assert "X-Session-ID" in response.json()["detail"]
+
+
+def test_upload_batch_exceeds_limit(client):
+    """Uploading more than 10 files → 400."""
+    pdf = make_pdf("Content")
+    files = [
+        ("files", (f"cv_{i}.pdf", io.BytesIO(pdf), "application/pdf"))
+        for i in range(11)
+    ]
+    response = client.post(
+        "/upload-batch",
+        files=files,
+        headers={"X-Session-ID": "test-user"},
+    )
+    assert response.status_code == 400
+    assert "Maximum" in response.json()["detail"]
+
+
+def test_upload_batch_rejects_non_pdf(client):
+    """A non-PDF mixed in the batch → 400."""
+    pdf = make_pdf("Good content")
+    response = client.post(
+        "/upload-batch",
+        files=[
+            ("files", ("cv.pdf", io.BytesIO(pdf), "application/pdf")),
+            ("files", ("notes.txt", io.BytesIO(b"text"), "text/plain")),
+        ],
+        headers={"X-Session-ID": "test-user"},
+    )
+    assert response.status_code == 400
+    assert "not a PDF" in response.json()["detail"]
+
+
+@patch("api.async_session")
+def test_upload_batch_success(mock_session_maker, client):
+    """Upload 2 valid PDFs → 202 with job_id."""
+    # Mock the DB session for the endpoint
+    # Use MagicMock so sync methods like .add() don't return coroutines
+    mock_session = MagicMock()
+    mock_session.commit = AsyncMock()
+    mock_session.execute = AsyncMock()
+    mock_session_maker.return_value.__aenter__ = AsyncMock(
+        return_value=mock_session
+    )
+    mock_session_maker.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    pdf1 = make_pdf("Leonardo Ruhmann. Python Developer.")
+    pdf2 = make_pdf("Maria Silva. Java Engineer.")
+
+    response = client.post(
+        "/upload-batch",
+        files=[
+            ("files", ("cv1.pdf", io.BytesIO(pdf1), "application/pdf")),
+            ("files", ("cv2.pdf", io.BytesIO(pdf2), "application/pdf")),
+        ],
+        headers={"X-Session-ID": "recruiter-123"},
+    )
+
+    assert response.status_code == 202
+    data = response.json()
+    assert "job_id" in data
+    # Verify it's a valid UUID string
+    import uuid
+    uuid.UUID(data["job_id"])  # Raises if not valid

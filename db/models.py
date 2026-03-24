@@ -20,6 +20,13 @@ class JobStatus(str, enum.Enum):
     FAILED = "FAILED"
 
 
+class ResultStatus(str, enum.Enum):
+    """Per-file outcome inside a batch — SUCCESS or FAILED."""
+
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+
 class BatchJob(Base):
     __tablename__ = "batch_jobs"
 
@@ -62,6 +69,10 @@ class ResumeResult(Base):
         nullable=False,
     )
     file_name: Mapped[str] = mapped_column(nullable=False)
+    status: Mapped[ResultStatus] = mapped_column(
+        default=ResultStatus.SUCCESS, index=True
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     text_preview: Mapped[str] = mapped_column(Text, nullable=False)
     skills: Mapped[dict] = mapped_column(JSON, default=dict)
     people: Mapped[list] = mapped_column(JSON, default=list)

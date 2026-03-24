@@ -36,9 +36,25 @@ ensure_venv() {
         success "Virtual environment created at $VENV_DIR"
     fi
 
-    info "Checking dependencies..."
-    "$VENV_PIP" install -r "$SCRIPT_DIR/requirements.txt" --quiet
-    success "Dependencies are up to date."
+    MARKER="$VENV_DIR/.req_hash"
+    CURRENT_HASH=$(md5sum "$SCRIPT_DIR/requirements.txt" | cut -d ' ' -f 1)
+
+    if [ ! -f "$MARKER" ] || [ "$(cat "$MARKER")" != "$CURRENT_HASH" ]; then
+        info "Changes detected in requirements.txt. Installing dependencies..."
+        "$VENV_PIP" install -r "$SCRIPT_DIR/requirements.txt" --quiet
+        echo "$CURRENT_HASH" > "$MARKER"
+        success "Dependencies are installed and up to date."
+    else
+        info "Dependencies are already installed and up to date. Skipping."
+    fi
+}
+
+ensure_node() {
+    if [ ! -d "$SCRIPT_DIR/frontend/node_modules" ]; then
+        warn "Node modules not found. Installing frontend dependencies..."
+        (cd "$SCRIPT_DIR/frontend" && npm install --silent)
+        success "Node modules installed."
+    fi
 }
 
 # ── Commands ─────────────────────────────────────────────────
@@ -48,8 +64,8 @@ start_api() {
 }
 
 start_app() {
-    info "Starting Streamlit frontend on http://localhost:8501 ..."
-    "$VENV_PYTHON" -m streamlit run "$SCRIPT_DIR/app.py"
+    info "Starting React (Vite) frontend on http://localhost:5173 ..."
+    cd "$SCRIPT_DIR/frontend" && npm run dev
 }
 
 run_tests() {
@@ -62,7 +78,7 @@ start_all() {
     echo ""
 
     # Start the API in the background
-    "$VENV_PYTHON" -m uvicorn api:app --host 127.0.0.1 --port 8000 &
+    "$VENV_PYTHON" -m uvicorn api:app --host 127.0.0.1 --port 8000 --reload &
     API_PID=$!
     success "API started (PID: $API_PID) → http://localhost:8000"
 
@@ -70,9 +86,9 @@ start_all() {
     sleep 2
 
     # Start the frontend in the background
-    "$VENV_PYTHON" -m streamlit run "$SCRIPT_DIR/app.py" &
+    (cd "$SCRIPT_DIR/frontend" && npm run dev) &
     APP_PID=$!
-    success "Frontend started (PID: $APP_PID) → http://localhost:8501"
+    success "Frontend started (PID: $APP_PID) → http://localhost:5173"
 
     echo ""
     info "Both services are running. Press Ctrl+C to stop."
@@ -85,6 +101,7 @@ start_all() {
 # ── Entry Point ──────────────────────────────────────────────
 cd "$SCRIPT_DIR"
 ensure_venv
+ensure_node
 
 case "${1:-all}" in
     api)   start_api ;;
