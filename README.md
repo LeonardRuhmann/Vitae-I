@@ -188,33 +188,7 @@ pytest tests/
 
 ## 🏗️ Architecture
 
-The system is a **fullstack application** with a clear separation of concerns across three layers:
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  FRONTEND (React + Vite + Material UI)       :5173           │
-│  ┌────────────┐  ┌──────────────┐  ┌───────────────────┐     │
-│  │ DropzoneArea│  │ App.tsx      │  │ ResultsView       │    │
-│  │ (Drag&Drop) ├─▶│ State Machine├─▶│ (Accordion+Chips) │   │
-│  └────────────┘  └──────┬───────┘  └───────────────────┘     │
-│                    Axios │ ▲ WebSocket                       │
-├──────────────────────────┼─┼────────────────────────────────-┤
-│  BACKEND (FastAPI + spaCy)│ │                    :8000       │
-│  ┌────────────────────┐  │ │  ┌───────────────────────┐     │
-│  │ POST /upload-batch  │◀─┘ │  │ ws://ws/jobs/{id}     │     │
-│  │ GET  /jobs/{id}     │    └──│ ConnectionManager     │     │
-│  └────────┬───────────┘       └───────────┬───────────┘     │
-│           │ BackgroundTasks               │ broadcast       │
-│  ┌────────▼───────────────────────────────▼──────────┐      │
-│  │ process_batch() — spaCy NLP + Semaphore(1)        │      │
-│  └────────────────────────┬──────────────────────────┘      │
-├───────────────────────────┼──────────────────────────────────┤
-│  DATABASE (PostgreSQL)    │                      :5432       │
-│  ┌────────────────────────▼──────────────────────────┐      │
-│  │ batch_jobs ──1:N──▶ resume_results                │      │
-│  └───────────────────────────────────────────────────┘      │
-└──────────────────────────────────────────────────────────────┘
-```
+![Batch Processing Architecture Diagram](./docs/architecture-diagram-batch-processing.png)
 
 > 📖 **Detailed documentation:** [Batch Processing & Production Architecture](./docs/fase-2-batch-processing.md) — trade-offs, architecture decisions, and technical debts.
 
