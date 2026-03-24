@@ -67,7 +67,7 @@ class ConnectionManager:
                 if not self.active_connections[job_id]:
                     del self.active_connections[job_id]
             except ValueError:
-                pass
+                logger.debug("WebSocket already removed from job '%s'. Skipping.", job_id)
 
     async def broadcast_to_job(self, job_id: str, message: dict):
         if job_id in self.active_connections:
