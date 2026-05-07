@@ -7,7 +7,8 @@ export interface ResumeResult {
   error_message: string | null;
   skills: string[];
   people: string[];
-  info: string[]; // Our backend currently returns a list and falls back to dict, but let's treat it as string[] for display
+  info: string[];
+  match_score: number | null;
 }
 
 export interface BatchJobResponse {
@@ -15,6 +16,7 @@ export interface BatchJobResponse {
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
   total_files: number;
   processed_files: number;
+  job_requirements: string[] | null;
   results: ResumeResult[];
 }
 
@@ -29,11 +31,15 @@ export const apiService = {
    * @param sessionId A unique session identifier for the pragmatic auth
    * @returns The job_id string
    */
-  async uploadBatch(files: File[], sessionId: string): Promise<string> {
+  async uploadBatch(files: File[], sessionId: string, jobDescription?: string): Promise<string> {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('files', file);
     });
+
+    if (jobDescription?.trim()) {
+      formData.append('job_description', jobDescription);
+    }
 
     const response = await api.post<{ job_id: string }>('/upload-batch', formData, {
       headers: {

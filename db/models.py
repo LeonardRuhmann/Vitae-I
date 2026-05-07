@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Text, func
+from sqlalchemy import Float, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -45,6 +45,10 @@ class BatchJob(Base):
         onupdate=func.now(),
     )
 
+    # ATS Matcher fields (Phase 5)
+    job_description_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_requirements: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     # Relationship: one job → many results
     results: Mapped[list["ResumeResult"]] = relationship(
         back_populates="job",
@@ -77,6 +81,7 @@ class ResumeResult(Base):
     skills: Mapped[dict] = mapped_column(JSON, default=dict)
     people: Mapped[list] = mapped_column(JSON, default=list)
     info: Mapped[dict] = mapped_column(JSON, default=dict)
+    match_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     # Relationship back to parent job
