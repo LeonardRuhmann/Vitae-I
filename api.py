@@ -10,6 +10,7 @@ from fastapi import (
     BackgroundTasks,
     FastAPI,
     File,
+    Form,
     HTTPException,
     Request,
     UploadFile,
@@ -211,6 +212,7 @@ async def upload_batch(
     request: Request,
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
+    job_description: str = Form(""),
 ):
     # --- Auth (pragmatic) ---
     user_id = request.headers.get("X-Session-ID")
@@ -235,6 +237,26 @@ async def upload_batch(
                 detail=f"File '{f.filename}' is not a PDF (got {f.content_type}).",
             )
 
+    # --- ATS Matcher: extract skills from Job Description (pre-loop) ---
+    nlp = request.app.state.nlp
+    jd_skills: set[str] | None = None
+
+    if job_description.strip():
+        jd_doc = nlp(job_description)
+        jd_skills = {
+            ent.text.lower() for ent in jd_doc.ents if ent.label_ == "SKILL"
+        }
+
+        if not jd_skills:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Could not identify any technologies in the job description. "
+                    "Please provide a more detailed description with specific "
+                    "skills and technologies."
+                ),
+            )
+
     # --- Create the job in the DB ---
     job_id = uuid.uuid4()
 
@@ -245,6 +267,8 @@ async def upload_batch(
             status=JobStatus.PROCESSING,
             total_files=len(files),
             processed_files=0,
+            job_description_text=job_description.strip() or None,
+            job_requirements=list(jd_skills) if jd_skills else None,
         )
         session.add(job)
         await session.commit()
@@ -279,7 +303,8 @@ async def upload_batch(
         process_batch,
         job_id=job_id,
         file_paths=file_paths,
-        nlp=request.app.state.nlp,
+        nlp=nlp,
+        jd_skills=jd_skills,
     )
 
     return {"job_id": str(job_id)}
@@ -292,6 +317,7 @@ async def process_batch(
     job_id: uuid.UUID,
     file_paths: list[tuple[str, Path]],
     nlp: spacy.Language,
+    jd_skills: set[str] | None = None,
 ) -> None:
     """Process every PDF in the batch, saving results one-by-one."""
     total_files = len(file_paths)
@@ -330,6 +356,13 @@ async def process_batch(
                     if is_valid_entity(ent.text, ent.label_):
                         info.add(ent.text)
 
+            # ATS Matcher: compute score if JD skills were provided
+            match_score: float | None = None
+            if jd_skills:
+                resume_skills_normalized = {s.lower() for s in skills}
+                common = jd_skills & resume_skills_normalized
+                match_score = round((len(common) / len(jd_skills)) * 100, 2)
+
             # Save successful result
             async with async_session() as session:
                 session.add(
@@ -341,6 +374,7 @@ async def process_batch(
                         skills=list(skills),
                         people=people,
                         info=list(info),
+                        match_score=match_score,
                     )
                 )
                 await session.commit()
@@ -476,6 +510,7 @@ async def get_job_results(job_id: uuid.UUID):
             "skills": r.skills,
             "people": r.people,
             "info": r.info,
+            "match_score": r.match_score,
         }
         for r in job.results
     ]
@@ -485,5 +520,6 @@ async def get_job_results(job_id: uuid.UUID):
         "status": job.status.value,
         "total_files": job.total_files,
         "processed_files": job.processed_files,
+        "job_requirements": job.job_requirements,
         "results": results_payload,
     }

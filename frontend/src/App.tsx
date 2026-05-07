@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Container, Box, LinearProgress, Paper, Button } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Box, LinearProgress, Paper, Button, Alert } from '@mui/material';
 import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
@@ -19,6 +19,7 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>('IDLE');
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobData, setJobData] = useState<BatchJobResponse | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Hook handles WebSocket connection automatically when jobId is set
   const { progress, statusMessage, isCompleted } = useJobWebSocket(
@@ -26,20 +27,32 @@ export default function App() {
   );
 
   // Triggered when DropzoneArea button is clicked
-  const handleProcessFiles = async (files: File[]) => {
+  const handleProcessFiles = async (files: File[], jobDescription: string) => {
     try {
       setAppState('UPLOADING');
+      setUploadError(null);
       
       // 1. Upload to REST API
-      const newJobId = await apiService.uploadBatch(files, SESSION_ID);
+      const newJobId = await apiService.uploadBatch(files, SESSION_ID, jobDescription);
       
       // 2. Switch to WebSocket Processing Phase
       setJobId(newJobId);
       setAppState('PROCESSING');
       
-    } catch (error) {
-      console.error("Upload failed:", error);
-      alert("Failed to upload files. Check the console for details.");
+    } catch (error: unknown) {
+      // Handle 422: JD had no recognized skills
+      if (
+        error !== null &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number; data?: { detail?: string } } }).response?.status === 422
+      ) {
+        const detail = (error as { response: { data: { detail: string } } }).response.data.detail;
+        setUploadError(detail);
+      } else {
+        console.error("Upload failed:", error);
+        setUploadError("Failed to upload files. Check the console for details.");
+      }
       setAppState('IDLE');
     }
   };
@@ -67,6 +80,7 @@ export default function App() {
   const handleReset = () => {
     setJobId(null);
     setJobData(null);
+    setUploadError(null);
     setAppState('IDLE');
   };
 
@@ -99,6 +113,11 @@ export default function App() {
         {/* State: IDLE or UPLOADING */}
         {(appState === 'IDLE' || appState === 'UPLOADING') && (
           <Box sx={{ mt: 2 }}>
+            {uploadError && (
+              <Alert severity="warning" onClose={() => setUploadError(null)} sx={{ mb: 3 }}>
+                {uploadError}
+              </Alert>
+            )}
             <DropzoneArea 
               onProcess={handleProcessFiles} 
               disabled={appState === 'UPLOADING'} 

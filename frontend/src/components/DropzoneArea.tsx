@@ -11,20 +11,23 @@ import {
   Button,
   Alert,
   Paper,
+  TextField,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DeleteIcon from '@mui/icons-material/Delete';
+import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
 
 const MAX_FILES = 10;
 
 interface DropzoneAreaProps {
-  onProcess: (files: File[]) => void;
+  onProcess: (files: File[], jobDescription: string) => void;
   disabled: boolean;
 }
 
 export default function DropzoneArea({ onProcess, disabled }: DropzoneAreaProps) {
   const [files, setFiles] = useState<File[]>([]);
+  const [jobDescription, setJobDescription] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
@@ -72,7 +75,7 @@ export default function DropzoneArea({ onProcess, disabled }: DropzoneAreaProps)
   };
 
   const handleProcess = () => {
-    onProcess(files);
+    onProcess(files, jobDescription);
   };
 
   // Dynamic styling based on drag state
@@ -156,6 +159,34 @@ export default function DropzoneArea({ onProcess, disabled }: DropzoneAreaProps)
           </Paper>
         </Box>
       )}
+
+      {/* Job Description Input (ATS Matcher) */}
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+          <WorkOutlineIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+          <Typography variant="subtitle2" color="text.secondary" fontWeight="bold">
+            Job Description (Optional)
+          </Typography>
+        </Box>
+        <TextField
+          id="job-description-input"
+          multiline
+          minRows={3}
+          maxRows={8}
+          fullWidth
+          placeholder="Paste the job description here to get a Match Score for each resume..."
+          value={jobDescription}
+          onChange={(e) => setJobDescription(e.target.value)}
+          disabled={disabled}
+          variant="outlined"
+          helperText="Skills will be automatically extracted and compared against each resume."
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              bgcolor: 'background.default',
+            },
+          }}
+        />
+      </Paper>
 
       {/* Action Button */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
