@@ -8,10 +8,12 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-teal?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
 [![spaCy](https://img.shields.io/badge/spaCy-3.8-09a3d5?logo=spacy)](https://spacy.io/)
-[![Version](https://img.shields.io/badge/version-v2.0.0-orange.svg)](#)
+[![Version](https://img.shields.io/badge/version-v2.1.0-orange.svg)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Upload up to 10 PDF resumes at once and get an instant AI-powered breakdown of each candidate's skills, identity, and key background — with real-time progress tracking via WebSockets.
+
+🚀 **Now with Smart Matcher Engine:** paste a job description and instantly rank candidates by how well they match the role's requirements.
 
 </div>
 
@@ -29,14 +31,16 @@ The project was built with the Brazilian job market in mind, where most resumes 
 
 ## 📸 Demo
 
-> **Drag & Drop Resumes → Watch Real-Time Progress → Get Structured Intelligence**
+> **Drag & Drop Resumes → Paste the Job Description → Watch Real-Time Progress → Get Ranked Intelligence**
 
 ```
 1. Open the React frontend at http://localhost:5173
 2. Drag & drop up to 10 PDF resumes (or click to select)
-3. Click "Process Batch"
-4. Watch the real-time progress bar as each resume is analyzed
-5. View extracted skills, people, and entities in the results panel
+3. Paste the job description in the "Job Description" field (optional)
+4. Click "Process Batch"
+5. Watch the real-time progress bar as each resume is analyzed
+6. View extracted skills, people, entities, and the Smart Match Score in the results panel
+   — candidates are automatically sorted from best to worst match
 ```
 
 > 📖 **API Details:** See the [API Reference](./docs/02-api-reference.md) for direct REST calls and JSON payloads.
@@ -163,11 +167,13 @@ pytest tests/
 
 > 📖 **Deep Dive:** Read our [Architecture & Trade-offs](./docs/01-architecture-and-tradeoffs.md) to understand the concurrency protection, WebSockets, and Database decisions.
 
+> 📖 **Match Algorithm:** Understand the math behind the Affinity Score in the [Smart Matcher Logic](./docs/04-smart-matcher-logic.md) document.
+
 ### Communication Flow
 
-1. **Upload (REST):** Frontend sends PDFs via `POST /upload-batch` → receives `job_id`
+1. **Upload (REST):** Frontend sends PDFs + optional Job Description via `POST /upload-batch` → receives `job_id`
 2. **Processing (WebSocket):** Frontend opens `ws://localhost:8000/ws/jobs/{job_id}` and receives `progress` events in real-time as each resume is processed by spaCy
-3. **Results (REST):** On `completed` event, frontend calls `GET /jobs/{job_id}` to fetch the full payload with all extracted entities
+3. **Results (REST):** On `completed` event, frontend calls `GET /jobs/{job_id}` to fetch the full payload with all extracted entities and match scores
 
 > 📖 **Under the Hood:** See how we customized spaCy and the Entity Ruler in our [NLP Engine Documentation](./docs/03-nlp-engine.md).
 
