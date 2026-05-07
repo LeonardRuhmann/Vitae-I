@@ -31,7 +31,7 @@ from config import (
 )
 from db.models import BatchJob, JobStatus, ResumeResult, ResultStatus
 from db.session import async_session
-from utils import clean_text, is_valid_entity, read_pdf
+from utils import clean_text, is_valid_entity, normalize_skill, read_pdf
 
 logger = logging.getLogger("vitae")
 
@@ -244,7 +244,7 @@ async def upload_batch(
     if job_description.strip():
         jd_doc = nlp(job_description)
         jd_skills = {
-            ent.text.lower() for ent in jd_doc.ents if ent.label_ == "SKILL"
+            normalize_skill(ent.text) for ent in jd_doc.ents if ent.label_ == "SKILL"
         }
 
         if not jd_skills:
@@ -359,9 +359,9 @@ async def process_batch(
             # ATS Matcher: compute score if JD skills were provided
             match_score: float | None = None
             if jd_skills:
-                resume_skills_normalized = {s.lower() for s in skills}
+                resume_skills_normalized = {normalize_skill(s) for s in skills}
                 common = jd_skills & resume_skills_normalized
-                match_score = round((len(common) / len(jd_skills)) * 100, 2)
+                match_score = round((len(common) / len(jd_skills)) * 100, 1)
 
             # Save successful result
             async with async_session() as session:

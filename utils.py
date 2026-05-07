@@ -1,6 +1,19 @@
 import re
 import io
+import unicodedata
 from pypdf import PdfReader
+
+
+def normalize_skill(text: str) -> str:
+    """Lowercase and strip accents for robust skill comparison.
+
+    Converts 'Inglês' → 'ingles', 'Node.js' → 'node.js', etc.
+    Uses Unicode NFD decomposition to separate base characters from
+    diacritical marks, then discards the marks.
+    """
+    text = text.lower()
+    nfkd = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 # Resume section headers (not People or Orgs)
 SECTION_HEADERS = {
