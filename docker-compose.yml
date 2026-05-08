@@ -1,21 +1,51 @@
 services:
   postgres:
     image: postgres:17
-    container_name: vitae-postgres
+    container_name: vitae_db
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-vitae}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vitae_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-vitae_db}
+      POSTGRES_USER: vitae
+      POSTGRES_PASSWORD: vitae_secret
+      POSTGRES_DB: vitae_db
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vitae}"]
+      test: ["CMD-SHELL", "pg_isready -U vitae -d vitae_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vitae_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vitae:vitae_secret@postgres:5432/vitae_db
+      - ALLOWED_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /tmp/vitae_uploads:/tmp/vitae_uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: vitae_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

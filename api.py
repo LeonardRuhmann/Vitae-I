@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import shutil
 import uuid
 from contextlib import asynccontextmanager
@@ -43,7 +44,7 @@ MAX_BATCH_SIZE = 10
 
 # Semaphore: limit concurrent spaCy calls to protect CPU/RAM.
 # Using 4 here is safe because the 'sm' model uses only ~50MB RAM.
-_processing_semaphore = asyncio.Semaphore(4)
+_processing_semaphore: asyncio.Semaphore | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +118,8 @@ def load_model_with_ruler() -> spacy.Language:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: load spaCy model & recover zombie jobs.  Shutdown: clean up."""
+    global _processing_semaphore
+    _processing_semaphore = asyncio.Semaphore(4)
 
     # 1) Load the NLP model
     app.state.nlp = load_model_with_ruler()
@@ -153,9 +156,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
 
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
