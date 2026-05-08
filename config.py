@@ -5,7 +5,7 @@ API_TITLE = "Vitae-I API"
 API_VERSION = "1.0.3"
 
 # SpaCy Model Configuration
-SPACY_MODEL = "pt_core_news_lg"
+SPACY_MODEL = "pt_core_news_sm"
 
 # Skills dictionary for NER patterns
 SKILLS = [
