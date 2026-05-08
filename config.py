@@ -9,7 +9,9 @@ SPACY_MODEL = "pt_core_news_lg"
 
 # Skills dictionary for NER patterns
 SKILLS = [
-    # Programming languages
+    # -----------------------------------------------------------------------
+    # Programming Languages
+    # -----------------------------------------------------------------------
     "Python",
     "Java",
     "C++",
@@ -23,8 +25,23 @@ SKILLS = [
     "Ruby",
     "Swift",
     "Objective-C",
+    "R",
+    "Scala",
+    "Dart",
+    "Lua",
+    "Perl",
+    "Elixir",
+    "Haskell",
+    "MATLAB",
+    "Shell Script",
+    "Bash",
+    "PowerShell",
+    "Groovy",
+    "Solidity",
 
-    # Web frontend
+    # -----------------------------------------------------------------------
+    # Web Frontend
+    # -----------------------------------------------------------------------
     "HTML",
     "CSS",
     "React",
@@ -33,8 +50,22 @@ SKILLS = [
     "Vue",
     "Svelte",
     "Tailwind",
+    "Bootstrap",
+    "jQuery",
+    "Redux",
+    "Sass",
+    "LESS",
+    "Webpack",
+    "Vite",
+    "Nuxt.js",
+    "Gatsby",
+    "Styled Components",
+    "Material UI",
+    "Storybook",
 
-    # Backend / frameworks
+    # -----------------------------------------------------------------------
+    # Backend / Frameworks
+    # -----------------------------------------------------------------------
     "Node.js",
     "Express",
     "Django",
@@ -46,16 +77,47 @@ SKILLS = [
     "Ruby on Rails",
     "ASP.NET",
     ".NET",
+    "NestJS",
+    "Gin",
+    "Fiber",
+    "GraphQL",
+    "gRPC",
+    "RabbitMQ",
+    "Kafka",
+    "Celery",
 
-    # Data / databases
+    # -----------------------------------------------------------------------
+    # Mobile
+    # -----------------------------------------------------------------------
+    "React Native",
+    "Flutter",
+    "Android",
+    "iOS",
+    "Xamarin",
+    "Ionic",
+
+    # -----------------------------------------------------------------------
+    # Data / Databases
+    # -----------------------------------------------------------------------
     "SQL",
     "MySQL",
     "PostgreSQL",
     "MongoDB",
     "Redis",
     "Elasticsearch",
+    "SQLite",
+    "Oracle",
+    "SQL Server",
+    "DynamoDB",
+    "Cassandra",
+    "Firebase",
+    "Supabase",
+    "Neo4j",
+    "MariaDB",
 
-    # DevOps / Cloud
+    # -----------------------------------------------------------------------
+    # DevOps / Cloud / Infrastructure
+    # -----------------------------------------------------------------------
     "Docker",
     "Kubernetes",
     "AWS",
@@ -65,25 +127,145 @@ SKILLS = [
     "GitHub",
     "GitLab",
     "CI/CD",
+    "CI CD",
+    "Continuous Integration",
     "Jenkins",
     "GitHub Actions",
+    "Linux",
+    "Terraform",
+    "Ansible",
+    "Prometheus",
+    "Grafana",
+    "Nginx",
+    "Apache",
+    "Vagrant",
+    "ArgoCD",
+    "Helm",
+    "CircleCI",
+    "Travis CI",
+    "Bitbucket",
+    "SonarQube",
+    "New Relic",
+    "Datadog",
 
-    # Data science / ML
+    # -----------------------------------------------------------------------
+    # AI / ML / Data Science
+    # -----------------------------------------------------------------------
     "Machine Learning",
+    "Aprendizado de Máquina",
     "Deep Learning",
+    "Aprendizado Profundo",
     "NLP",
+    "Processamento de Linguagem Natural",
+    "Computer Vision",
+    "Visão Computacional",
+    "Visao Computacional",
+    "OpenCV",
+    "YOLO",
     "SpaCy",
     "Scikit-Learn",
     "Pandas",
     "NumPy",
     "TensorFlow",
     "PyTorch",
+    "Keras",
+    "Hugging Face",
+    "LLM",
+    "LLMs",
+    "Large Language Models",
+    "Generative AI",
+    "IA Generativa",
+    "Prompt Engineering",
+    "RAG",
+    "LangChain",
+    "MLflow",
+    "Apache Spark",
+    "Airflow",
+    "dbt",
+    "Power BI",
+    "Tableau",
+    "Matplotlib",
+    "Seaborn",
+    "Jupyter",
+    "Inteligência Artificial",
+    "Artificial Intelligence",
+    "IA",
+    "AI",
 
-    # Design / other tools
+    # -----------------------------------------------------------------------
+    # Testing / QA
+    # -----------------------------------------------------------------------
+    "Jest",
+    "Cypress",
+    "Selenium",
+    "Playwright",
+    "Pytest",
+    "JUnit",
+    "Postman",
+    "Insomnia",
+    "TDD",
+    "BDD",
+
+    # -----------------------------------------------------------------------
+    # Security
+    # -----------------------------------------------------------------------
+    "OWASP",
+    "Pentest",
+    "Burp Suite",
+
+    # -----------------------------------------------------------------------
+    # Agile / Project Management
+    # -----------------------------------------------------------------------
+    "Scrum",
+    "Kanban",
+    "Jira",
+    "Confluence",
+    "Trello",
+    "Notion",
+
+    # -----------------------------------------------------------------------
+    # Design
+    # -----------------------------------------------------------------------
     "Figma",
     "Adobe XD",
+    "Photoshop",
+    "Illustrator",
+    "Sketch",
+    "InVision",
+    "Canva",
 
+    # -----------------------------------------------------------------------
+    # Architecture / Patterns / Protocols
+    # -----------------------------------------------------------------------
+    "REST API",
+    "API REST",
+    "WebSockets",
+    "Microservices",
+    "Microsserviços",
+    "Clean Architecture",
+    "SOLID",
+    "Design Patterns",
+    "OAuth",
+    "JWT",
+
+    # -----------------------------------------------------------------------
+    # Enterprise / CRM / CMS
+    # -----------------------------------------------------------------------
+    "SAP",
+    "Salesforce",
+    "HubSpot",
+    "WordPress",
+    "Shopify",
+
+    # -----------------------------------------------------------------------
+    # Compliance / Privacy
+    # -----------------------------------------------------------------------
+    "LGPD",
+    "GDPR",
+
+    # -----------------------------------------------------------------------
     # Languages (idiomas)
+    # -----------------------------------------------------------------------
     "Inglês",
     "Espanhol",
     "Francês",
