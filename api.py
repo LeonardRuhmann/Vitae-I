@@ -31,7 +31,7 @@ from config import (
 )
 from db.models import BatchJob, JobStatus, ResumeResult, ResultStatus
 from db.session import async_session
-from utils import clean_text, is_valid_entity, normalize_skill, read_pdf
+from utils import clean_text, extract_name_heuristic, is_valid_entity, normalize_skill, read_pdf
 
 logger = logging.getLogger("vitae")
 
@@ -178,20 +178,23 @@ async def analyze_resume(request: Request, file: UploadFile = File(...)):
             detail="Couldn't extract text from PDF. It might be an image scan",
         )
 
+    # Heuristic name extraction (before clean_text destroys line breaks)
+    heuristic_name = extract_name_heuristic(raw_text)
+
     processed_text = clean_text(raw_text)
 
     nlp = request.app.state.nlp
     doc = nlp(processed_text)
 
     skills = set()
-    people = []
+    people = [heuristic_name] if heuristic_name else []
     info = set()
 
     for ent in doc.ents:
         if ent.label_ == "SKILL":
             skills.add(ent.text)
         elif ent.label_ == "PER" and not people and is_valid_entity(ent.text, ent.label_):
-            people.append(ent.text)
+            people.append(ent.text)  # spaCy fallback if heuristic missed
         else:
             if is_valid_entity(ent.text, ent.label_):
                 info.add(ent.text)
@@ -332,6 +335,9 @@ async def process_batch(
             if not raw_text.strip():
                 raise ValueError("Could not extract text (possibly an image scan)")
 
+            # Heuristic name extraction (before clean_text destroys line breaks)
+            heuristic_name = extract_name_heuristic(raw_text)
+
             processed_text = clean_text(raw_text)
 
             # Run spaCy inside the semaphore, offloaded to a thread
@@ -340,7 +346,7 @@ async def process_batch(
 
             # Extract entities
             skills: set[str] = set()
-            people: list[str] = []
+            people: list[str] = [heuristic_name] if heuristic_name else []
             info: set[str] = set()
 
             for ent in doc.ents:
@@ -351,7 +357,7 @@ async def process_batch(
                     and not people
                     and is_valid_entity(ent.text, ent.label_)
                 ):
-                    people.append(ent.text)
+                    people.append(ent.text)  # spaCy fallback
                 else:
                     if is_valid_entity(ent.text, ent.label_):
                         info.add(ent.text)

@@ -7,7 +7,10 @@
 ## 💡 Technical Decisions
 
 ### Why spaCy and not a transformer (BERT/GPT)?
-Speed and practicality. Resume analysis needs to be snappy and run local without a GPU. `pt_core_news_lg` is a well-trained Portuguese model that gives solid NER performance for person/org/location detection, and by layering the `entity_ruler` on top of it, the accuracy on skill extraction becomes near-perfect without any fine-tuning cost.
+Speed, memory efficiency, and practicality. Resume analysis needs to be snappy, run local without a GPU, and be deployable on Free Tier cloud hosting. Initially, `pt_core_news_lg` was used, but it consumed over 800MB of RAM, causing Out-Of-Memory kills on 512MB limits. By replacing it with `pt_core_news_sm` (~50MB RAM) and layering the `entity_ruler` on top of it, the accuracy on skill extraction remains near-perfect with a fraction of the memory footprint.
+
+### Why a heuristic for Name Extraction?
+General-purpose neural models (both `sm` and `lg`) are inconsistent at extracting candidate names in Brazilian Portuguese resumes, often cutting off surnames or confusing them with job titles. We built a structural heuristic that bypasses the model to find the name by analyzing the document's layout (e.g., handling LinkedIn's specific sidebar PDF export). The Neural NER is now strictly a fallback. This specific optimization unlocked the ability to downgrade the spaCy model without sacrificing name detection quality.
 
 ### Why a hybrid rule-based + neural approach?
 Skills like "React" or "FastAPI" are proper nouns but not famous enough for a general-purpose NER model to learn. A pure neural approach would miss most tech skills. Pure rule-based would miss candidate names. The hybrid approach gets the best of both worlds.

@@ -184,3 +184,126 @@ def read_pdf(file_byte: bytes) -> str:
     except Exception as e:
         # If the pdf is corrupted or weird, return empty string
         return ""
+
+
+def _is_name_line(line: str, blocklist: set[str]) -> bool:
+    """Return True if *line* looks like a person's full name.
+
+    Rules:
+    - 2-5 words (first name + optional middle/last names)
+    - Each significant word starts with an uppercase letter
+    - No digits, emails, URLs or special characters
+    - Not a known section header, job title, or skill keyword
+    """
+    line = line.strip()
+    if not line:
+        return False
+
+    # Length guard: too short or too long
+    if len(line) < 3 or len(line) > 60:
+        return False
+
+    # Reject lines with digits, emails, URLs, or special characters
+    if re.search(r"\d|@|https?://|www\.|\.com|[#$%&*!?;:/\\|<>{}()\[\]]", line):
+        return False
+
+    words = line.split()
+    if len(words) < 2 or len(words) > 5:
+        return False
+
+    # Reject if any word is a known non-name keyword
+    if any(w.lower() in blocklist for w in words):
+        return False
+
+    # Allow common PT-BR name prepositions: de, da, do, dos, das, e, di
+    prepositions = {"de", "da", "do", "dos", "das", "e", "di"}
+    significant_words = [w for w in words if w.lower() not in prepositions]
+
+    if not significant_words:
+        return False
+
+    return all(w[0].isupper() for w in significant_words)
+
+
+# LinkedIn sidebar markers — when present, the sidebar is extracted before
+# the main body, pushing the candidate name 10-30 lines down.
+_LINKEDIN_SIDEBAR_MARKERS = {
+    "contato", "contact",
+    "principais competências", "top skills",
+    "languages", "certifications",
+}
+
+
+def extract_name_heuristic(raw_text: str) -> str | None:
+    """Extract candidate name from the first lines of a resume.
+
+    Handles two layouts:
+
+    1. **Standard resume** — the name is on line 1 or 2.
+    2. **LinkedIn PDF export** — a sidebar (contact info, skills,
+       certifications) is extracted first by pypdf.  The candidate name
+       appears only after the sidebar ends.
+
+    Strategy:
+        - Detect LinkedIn sidebar markers.
+        - If found, search the first 60 lines for a name-like line that is
+          followed by a headline (contains '|' or job keywords) or location.
+        - Otherwise, scan the first 10 lines normally.
+
+    Args:
+        raw_text: The *raw* text extracted from the PDF, **before**
+                  ``clean_text()`` is applied (line breaks still intact).
+
+    Returns:
+        The detected name or ``None`` if no candidate line was found.
+    """
+    blocklist = INVALID_WORDS | JOB_KEYWORDS
+    all_lines = raw_text.split("\n")
+
+    # --- Detect LinkedIn layout ---
+    # Check first 10 lines for sidebar markers
+    is_linkedin = False
+    for line in all_lines[:10]:
+        stripped = line.strip().lower()
+        if stripped in _LINKEDIN_SIDEBAR_MARKERS:
+            is_linkedin = True
+            break
+
+    if is_linkedin:
+        for i, line in enumerate(all_lines[:60]):
+            stripped = line.strip()
+            if _is_name_line(stripped, blocklist):
+                # Check the immediately next 1-2 non-empty lines
+                next_lines = [l.strip() for l in all_lines[i+1:i+4] if l.strip()]
+                if not next_lines:
+                    continue
+                
+                nl1 = next_lines[0].lower()
+                nl2 = next_lines[1].lower() if len(next_lines) > 1 else ""
+                
+                is_valid = False
+                
+                # Check if next line is a headline or location
+                if "|" in nl1 or any(job in nl1 for job in JOB_KEYWORDS):
+                    is_valid = True
+                elif any(loc in nl1 for loc in ["brasil", "região", "regiao"]):
+                    is_valid = True
+                # Sometimes the headline is split or on the second line
+                elif "|" in nl2 or any(job in nl2 for job in JOB_KEYWORDS):
+                    is_valid = True
+                elif any(loc in nl2 for loc in ["brasil", "região", "regiao"]):
+                    is_valid = True
+                    
+                # Prevent false positives where the NEXT line is actually the name
+                if _is_name_line(next_lines[0], blocklist):
+                    is_valid = False
+
+                if is_valid:
+                    return stripped
+
+    # --- Standard resume layout (or LinkedIn fallback) ---
+    for line in all_lines[:10]:
+        if _is_name_line(line.strip(), blocklist):
+            return line.strip()
+
+    return None
