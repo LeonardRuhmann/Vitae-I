@@ -24,5 +24,5 @@ COPY . .
 # Expose the API port
 EXPOSE $PORT
 
-# Run the FastAPI server
-CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT}"]
+# Run migrations and start the server
+CMD ["sh", "-c", "alembic upgrade head && uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
