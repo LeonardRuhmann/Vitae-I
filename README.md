@@ -66,60 +66,46 @@ The project was built with the Brazilian job market in mind, where most resumes 
 
 ## ✅ Prerequisites
 
-- Python **3.10 or higher**
-- `pip` and `venv`
-- **Node.js 18+** and **npm** (for the React frontend)
-- **Docker** and **Docker Compose** (for PostgreSQL)
-- ~600 MB free disk space (for the spaCy Portuguese NLP model)
+- **Docker** and **Docker Compose** (Recommended)
+- OR: Python **3.10+** and **Node.js 18+** (for manual local development)
 
 ---
 
-## 🚀 Installation
+## 🚀 Quick Start (Docker)
+
+The easiest way to run the project is using Docker. You don't need Python or Node.js installed on your machine.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/LeonardRuhmann/Vitae-I.git
 cd vitae-i
 
-# 2. Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# 3. Install Python dependencies
-pip install -r requirements.txt
-
-# 4. Install frontend dependencies
-cd frontend && npm install && cd ..
-
-# 5. Set up environment variables
-cp .env.example .env
-
-# 6. Start PostgreSQL and run the database migration
-sudo docker-compose up -d
-alembic upgrade head
+# 2. Start the full stack (Database + API + Frontend)
+chmod +x run.sh
+./run.sh docker
 ```
 
-> The `requirements.txt` includes the `pt_core_news_lg` spaCy model directly from its GitHub release URL, so no separate `spacy download` command is needed.
-> The `run.sh` script automates steps 2–4 automatically on first run.
+That's it! The application will be available at:
+- **Frontend:** http://localhost
+- **API Docs:** http://localhost:8000/docs
 
 ---
 
-## ▶️ How to Run
+## 🛠️ Local Development (Without Docker)
 
-A `run.sh` script is provided to make startup straightforward.
+If you want to run the project natively for development, a `run.sh` script is provided to automate the setup.
 
-### Run everything (API + Frontend)
+### Run everything locally
 
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
-This will start:
-- The **FastAPI backend** at `http://localhost:8000` (with `--reload`)
-- The **React frontend** at `http://localhost:5173` (Vite dev server)
-
-The script automatically provisions the Python `venv`, installs `pip` dependencies (hash-based change detection), and runs `npm install` if `node_modules/` is missing.
+This will automatically create a `venv`, install dependencies, and start:
+- **FastAPI backend** at `http://localhost:8000` (with `--reload`)
+- **React frontend** at `http://localhost:5173` (Vite dev server)
+- *(Note: You still need a PostgreSQL instance running locally. See `.env.example`)*
 
 ### Run individually
 

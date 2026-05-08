@@ -2,10 +2,11 @@
 # ============================================================
 #  Vitae-I — Project Runner
 #  Usage:
-#    ./run.sh          → Start API + Frontend (full stack)
-#    ./run.sh api      → Start API only
-#    ./run.sh app      → Start Frontend only
-#    ./run.sh test     → Run the test suite
+#    ./run.sh docker   → Start full stack via Docker (RECOMMENDED for production/demo)
+#    ./run.sh          → Start API + Frontend locally (development)
+#    ./run.sh api      → Start API only locally
+#    ./run.sh app      → Start Frontend only locally
+#    ./run.sh test     → Run the test suite locally
 # ============================================================
 
 set -e
@@ -98,18 +99,29 @@ start_all() {
     wait
 }
 
+start_docker() {
+    info "Starting full stack via Docker Compose (PostgreSQL + API + Frontend)..."
+    # Check if docker-compose exists, fallback to docker compose
+    if command -v docker-compose &> /dev/null; then
+        docker-compose up --build
+    else
+        docker compose up --build
+    fi
+}
+
 # ── Entry Point ──────────────────────────────────────────────
 cd "$SCRIPT_DIR"
 ensure_venv
 ensure_node
 
 case "${1:-all}" in
-    api)   start_api ;;
-    app)   start_app ;;
-    test)  run_tests ;;
-    all)   start_all ;;
+    api)    start_api ;;
+    app)    start_app ;;
+    test)   run_tests ;;
+    docker) start_docker ;;
+    all)    start_all ;;
     *)
-        echo "Usage: $0 [api|app|test|all]"
+        echo "Usage: $0 [docker|api|app|test|all]"
         exit 1
         ;;
 esac
