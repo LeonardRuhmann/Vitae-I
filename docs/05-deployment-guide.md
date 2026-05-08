@@ -26,19 +26,20 @@ Save this URL for the next step.
 
 ## 🟣 2. Backend: Render (FastAPI)
 
-Render provides a fantastic Free Web Service tier that automatically builds your Docker image from GitHub. We've already added a `render.yaml` file to make this seamless.
+Render provides a fantastic Free Web Service tier that automatically builds your Docker image from GitHub.
 
 ### Steps:
-1. Go to [Render.com](https://render.com/) and link your GitHub account.
-2. Click **New** > **Blueprint**.
-3. Connect your `Vitae-I` GitHub repository.
-4. Render will automatically detect the `render.yaml` file and prepare the `vitae-api` Web Service.
-5. In the final step before applying, Render will ask you to fill in the missing Environment Variables:
+1. Go to [Render.com](https://render.com/) and click **New service** > **Web Service**.
+2. Connect your `Vitae-I` GitHub repository.
+3. In the configuration page, ensure the following settings are selected:
+   * **Language / Environment:** `Docker` (Render should detect this automatically from our `Dockerfile`).
+   * **Instance Type:** `Free`
+4. Scroll down to **Environment Variables** and add:
    * **`DATABASE_URL`**: Paste the connection string you got from Aiven (the one with `postgresql+asyncpg://`).
    * **`ALLOWED_ORIGINS`**: Leave this empty for a moment (we will update it after we deploy Netlify).
-6. Click **Apply**.
-7. Render will now clone the repo, build the Dockerfile, download the spaCy model, and start the API.
-8. Once deployed, copy your backend URL (e.g., `https://vitae-api.onrender.com`).
+5. Click **Create Web Service**.
+6. Render will now clone the repo, build the Docker image, download the spaCy model, and start the API.
+7. Once deployed, copy your backend URL (e.g., `https://vitae-api.onrender.com`) from the top left corner.
 
 ---
 
