@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Container, Box, LinearProgress, Paper, Button, Alert } from '@mui/material';
-import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import DropzoneArea from './components/DropzoneArea';
@@ -31,14 +30,14 @@ export default function App() {
     try {
       setAppState('UPLOADING');
       setUploadError(null);
-      
+
       // 1. Upload to REST API
       const newJobId = await apiService.uploadBatch(files, SESSION_ID, jobDescription);
-      
+
       // 2. Switch to WebSocket Processing Phase
       setJobId(newJobId);
       setAppState('PROCESSING');
-      
+
     } catch (error: unknown) {
       // Handle 422: JD had no recognized skills
       if (
@@ -89,7 +88,12 @@ export default function App() {
       {/* Top Navigation */}
       <AppBar position="static" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar>
-          <BatchPredictionIcon sx={{ mr: 2, color: 'primary.main' }} />
+          <Box
+            component="img"
+            src="/logo.png"
+            alt="Vitae-I Logo"
+            sx={{ width: 32, height: 32, mr: 2, borderRadius: '8px' }}
+          />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
             Vitae-I: Batch Processing
           </Typography>
@@ -102,14 +106,14 @@ export default function App() {
           <Typography variant="h4" component="h1" fontWeight={700}>
             Workspace
           </Typography>
-          
+
           {appState === 'COMPLETED' && (
-             <Button startIcon={<ArrowBackIcon />} onClick={handleReset} variant="outlined">
-               New Batch
-             </Button>
+            <Button startIcon={<ArrowBackIcon />} onClick={handleReset} variant="outlined">
+              New Batch
+            </Button>
           )}
         </Box>
-        
+
         {/* State: IDLE or UPLOADING */}
         {(appState === 'IDLE' || appState === 'UPLOADING') && (
           <Box sx={{ mt: 2 }}>
@@ -118,9 +122,9 @@ export default function App() {
                 {uploadError}
               </Alert>
             )}
-            <DropzoneArea 
-              onProcess={handleProcessFiles} 
-              disabled={appState === 'UPLOADING'} 
+            <DropzoneArea
+              onProcess={handleProcessFiles}
+              disabled={appState === 'UPLOADING'}
             />
           </Box>
         )}
