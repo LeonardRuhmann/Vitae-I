@@ -17,8 +17,10 @@ Aiven provides a fully managed, robust PostgreSQL instance on their free tier.
 4. Give your service a name (e.g., `vitae-db`) and click **Create**.
 5. Once the service is running, find the **Connection URI** (or `DATABASE_URL`) on the Overview page.
    * It will look something like: `postgres://avnadmin:password@host.aivencloud.com:port/defaultdb?sslmode=require`
-6. **CRITICAL:** Change the prefix from `postgres://` to `postgresql+asyncpg://` to match our async driver!
-   * *Example:* `postgresql+asyncpg://avnadmin:password@host.aivencloud.com:port/defaultdb?sslmode=require`
+6. **CRITICAL:** Adjust the URL for our async driver:
+   * Change the prefix from `postgres://` to `postgresql+asyncpg://`
+   * Change `?sslmode=require` at the end to `?ssl=require`
+   * *Example:* `postgresql+asyncpg://avnadmin:password@host.aivencloud.com:port/defaultdb?ssl=require`
 
 Save this URL for the next step.
 
