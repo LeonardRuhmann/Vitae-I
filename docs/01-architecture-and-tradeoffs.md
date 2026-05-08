@@ -52,9 +52,9 @@ To ensure that **Vitae-I** is scalable, agile, and viable for hosting on *Free T
 * **Decision:** The entities extracted by the AI model (Skills, People, Locations) are saved directly in `JSON`-type columns in PostgreSQL, instead of separate relational tables.
 * **Trade-off:** We lose some rigidity and foreign key validation for these specific tags. In return, we gain extreme flexibility: if the NLP model is updated to extract new data categories tomorrow, the database accepts them immediately, with no new *Migrations* required.
 
-### 3. Concurrency: Fair Interleaving with `asyncio.Semaphore(1)`
-* **Decision:** Batch processing is not aggressively parallelized. We limit the synchronous spaCy model extraction to 1 document at a time globally, using Threads.
-* **Trade-off:** The total time to process 100 resumes is technically longer. However, we protect the server's RAM (avoiding *Out of Memory* crashes), while the interleaving logic ensures that multiple recruiters see their progress bars moving simultaneously in the interface.
+### 3. Concurrency: Interleaving with `asyncio.Semaphore(4)`
+* **Decision:** Batch processing handles multiple documents concurrently, limited by a Semaphore set to 4.
+* **Trade-off:** Previously set to 1 when using the heavy `lg` model to prevent Out-of-Memory crashes, downgrading to the `sm` model allowed us to safely quadruple the throughput. A limit of 4 ensures that even on memory-constrained Free Tier servers (512MB RAM), the application remains highly stable while allowing multiple recruiters to see their progress bars moving simultaneously in the interface.
 
 ### 4. Cost Management: Retention Policy (24h TTL)
 * **Decision:** We implemented the database relationship with `cascade="all, delete-orphan"`, laying the groundwork for a *Garbage Collector* that deletes jobs older than 24 hours.

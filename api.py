@@ -41,8 +41,9 @@ logger = logging.getLogger("vitae")
 UPLOAD_DIR = Path("/tmp/vitae_uploads")
 MAX_BATCH_SIZE = 10
 
-# Semaphore: allow only 1 concurrent spaCy call to protect CPU / RAM.
-_processing_semaphore = asyncio.Semaphore(1)
+# Semaphore: limit concurrent spaCy calls to protect CPU/RAM.
+# Using 4 here is safe because the 'sm' model uses only ~50MB RAM.
+_processing_semaphore = asyncio.Semaphore(4)
 
 
 # ---------------------------------------------------------------------------
