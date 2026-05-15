@@ -212,6 +212,9 @@ async def analyze_resume(request: Request, file: UploadFile = File(...)):
         "info": list(info),
     }
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # ---------------------------------------------------------------------------
 # Batch upload endpoint  (Phase 2)
@@ -317,10 +320,6 @@ async def upload_batch(
     )
 
     return {"job_id": str(job_id)}
-
-    @app.get("/health")
-    async def health():
-        return {"status": "ok"}
 
 # ---------------------------------------------------------------------------
 # Background batch processor
