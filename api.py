@@ -318,6 +318,9 @@ async def upload_batch(
 
     return {"job_id": str(job_id)}
 
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
 
 # ---------------------------------------------------------------------------
 # Background batch processor
